@@ -6,8 +6,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
@@ -29,17 +27,21 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCountUp } from "@/hooks/use-count-up";
-import type { ModelInfo, ModelMetrics } from "@/lib/detection";
+import {
+  evaluationFor,
+  type ConfusionCounts,
+  type ModelDataset,
+  type ModelInfo,
+} from "@/lib/detection";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { deriveMetrics, prCurve, rocCurve, scoreDistribution } from "@/lib/metrics";
-import { modelColor } from "@/lib/models-query";
+import { modelColor } from "@/lib/model-colors";
 import { cn } from "@/lib/utils";
 
 /*
- * Colores de serie: --series-1..3 en styles.css, validados con el checker de
- * paletas (CVD ΔE ≥ 19 claro/oscuro). El color sigue a la entidad (posición
- * del modelo en el catálogo), nunca al ranking. IA/Humano usan los tokens de
- * estado destructive/success, igual que el resto de la app.
+ * Colores de serie: --series-1..3 en styles.css (validados CVD ΔE ≥ 19 claro/oscuro) para las
+ * montañas y gris atenuado para los experimentales (ver src/lib/model-colors.ts). El color sigue
+ * a la entidad, nunca al ranking de una métrica. IA/Humano usan los tokens destructive/success.
  */
 
 const AXIS = {
@@ -63,21 +65,26 @@ export function StatTile({
   desc,
   value,
   format,
+  pendingNote,
   delay = 0,
 }: {
   label: string;
   desc: string;
-  value: number;
+  /** null = métrica no disponible para este modelo/dataset. */
+  value: number | null;
   format: StatFormat;
+  pendingNote: string;
   delay?: number;
 }) {
-  const animated = useCountUp(value);
+  const animated = useCountUp(value ?? 0);
   const text =
-    format === "pct"
-      ? pct(animated)
-      : format === "ms"
-        ? `${Math.round(animated)} ms`
-        : animated.toFixed(3);
+    value === null
+      ? "—"
+      : format === "pct"
+        ? pct(animated)
+        : format === "ms"
+          ? `${Math.round(animated)} ms`
+          : animated.toFixed(3);
 
   return (
     <div
@@ -96,10 +103,33 @@ export function StatTile({
               <Info className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent className="max-w-60">{desc}</TooltipContent>
+          <TooltipContent className="max-w-60">
+            <p>{desc}</p>
+            {value === null && <p className="mt-1 opacity-80">{pendingNote}</p>}
+          </TooltipContent>
         </Tooltip>
       </div>
-      <p className="mt-1 text-2xl font-semibold tracking-tight">{text}</p>
+      <p
+        className={cn(
+          "mt-1 text-2xl font-semibold tracking-tight",
+          value === null && "text-muted-foreground",
+        )}
+      >
+        {text}
+      </p>
+    </div>
+  );
+}
+
+/** Estado vacío para gráficas sin datos aplicables. */
+export function EmptyChartState({ message, height = 250 }: { message: string; height?: number }) {
+  return (
+    <div
+      className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border px-6 text-center text-sm text-muted-foreground"
+      style={{ height }}
+    >
+      <Info className="h-5 w-5" />
+      <p className="max-w-sm">{message}</p>
     </div>
   );
 }
@@ -240,7 +270,7 @@ export function PrChart({
 
 // ── Matriz de confusión ──────────────────────────────────────────────────────
 
-export function ConfusionMatrix({ confusion }: { confusion: ModelMetrics["confusion"] }) {
+export function ConfusionMatrix({ confusion }: { confusion: ConfusionCounts }) {
   const { t, locale } = useI18n();
   const { true_ai: tp, false_ai: fp, true_human: tn, false_human: fn } = confusion;
   const actualAi = tp + fn;
@@ -342,10 +372,12 @@ export function ScoreChart({
   auc,
   positives,
   negatives,
+  threshold,
 }: {
   auc: number;
   positives: number;
   negatives: number;
+  threshold: number;
 }) {
   const { t, locale } = useI18n();
   const data = useMemo(
@@ -377,13 +409,13 @@ export function ScoreChart({
               ...AXIS_LABEL,
             }}
           />
-          <YAxis width={44} {...AXIS} tickFormatter={(v: number) => v.toLocaleString(locale)} />
+          <YAxis width={52} {...AXIS} tickFormatter={(v: number) => v.toLocaleString(locale)} />
           <ReferenceLine
-            x={0.5}
+            x={threshold}
             stroke="var(--color-foreground)"
             strokeOpacity={0.5}
             label={{
-              value: `${t("chart.threshold")} 0.5`,
+              value: `${t("chart.threshold")} ${threshold.toFixed(2)}`,
               position: "insideTopRight",
               ...AXIS_LABEL,
             }}
@@ -393,7 +425,7 @@ export function ScoreChart({
             content={
               <ChartTooltip
                 title={(l) => `${t("chart.score")} ≈ ${Number(l).toFixed(2)}`}
-                format={(v) => `${v.toLocaleString(locale)} ${t("chart.calls").toLowerCase()}`}
+                format={(v) => v.toLocaleString(locale)}
               />
             }
           />
@@ -424,133 +456,155 @@ export function ScoreChart({
   );
 }
 
-// ── Evolución mensual ────────────────────────────────────────────────────────
+// ── Generalización entre datasets ────────────────────────────────────────────
 
-type TrendMetric = "accuracy" | "f1" | "auc";
-const TREND_LABELS: Record<TrendMetric, TKey> = {
-  accuracy: "metric.accuracy",
-  f1: "metric.f1",
+type GeneralizationMetric = "auc" | "balanced_accuracy";
+const GENERALIZATION_LABELS: Record<GeneralizationMetric, TKey> = {
   auc: "metric.auc",
+  balanced_accuracy: "metric.balanced",
+};
+// Dos series que representan datasets (no modelos): tokens de gráfica del tema.
+const DATASET_COLORS: Record<ModelDataset, string> = {
+  Altur: "var(--chart-2)",
+  AlternativeData: "var(--chart-4)",
 };
 
-export function TrendChart({ models, selectedId }: { models: ModelInfo[]; selectedId: string }) {
-  const { t, locale } = useI18n();
-  const [metric, setMetric] = useState<TrendMetric>("accuracy");
+export function GeneralizationChart({
+  models,
+  selectedId,
+}: {
+  models: ModelInfo[];
+  selectedId: string;
+}) {
+  const { t } = useI18n();
+  const [metric, setMetric] = useState<GeneralizationMetric>("auc");
 
-  const data = useMemo(() => {
-    const months = [
-      ...new Set(models.flatMap((m) => m.metrics.history.map((h) => h.month))),
-    ].sort();
-    return months.map((month) => {
-      const row: Record<string, string | number> = { month };
-      for (const m of models) {
-        const point = m.metrics.history.find((h) => h.month === month);
-        if (point) row[m.id] = point[metric];
-      }
-      return row;
-    });
-  }, [models, metric]);
-
-  const monthFormat = useMemo(
-    () => new Intl.DateTimeFormat(locale, { month: "short", year: "2-digit" }),
-    [locale],
+  const data = useMemo(
+    () =>
+      models.map((m) => {
+        const row: Record<string, string | number> = {
+          model: m.id === selectedId ? `▸ ${m.name}` : m.name,
+        };
+        for (const dataset of ["Altur", "AlternativeData"] as const) {
+          const value = evaluationFor(m, dataset)?.[metric];
+          if (value !== null && value !== undefined) row[dataset] = value;
+        }
+        return row;
+      }),
+    [models, metric, selectedId],
   );
-  const formatMonth = (month: string | number) =>
-    monthFormat.format(new Date(`${month}-15T00:00:00Z`));
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Legend
-          line
-          items={models.map((m) => ({
-            label: m.name,
-            color: modelColor(models, m.id),
-            muted: m.id !== selectedId,
-          }))}
+          items={[
+            { label: t("model.datasetCalls"), color: DATASET_COLORS.Altur },
+            { label: t("model.datasetClips"), color: DATASET_COLORS.AlternativeData },
+          ]}
         />
         <ToggleGroup
           type="single"
           size="sm"
           variant="outline"
           value={metric}
-          onValueChange={(v) => v && setMetric(v as TrendMetric)}
+          onValueChange={(v) => v && setMetric(v as GeneralizationMetric)}
           aria-label={t("chart.metric")}
         >
-          {(Object.keys(TREND_LABELS) as TrendMetric[]).map((k) => (
+          {(Object.keys(GENERALIZATION_LABELS) as GeneralizationMetric[]).map((k) => (
             <ToggleGroupItem key={k} value={k} className="px-3 text-xs">
-              {t(TREND_LABELS[k])}
+              {t(GENERALIZATION_LABELS[k])}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
       </div>
-      <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={data} margin={{ top: 10, right: 16, bottom: 4, left: 4 }}>
-          <CartesianGrid vertical={false} stroke="var(--color-border)" />
-          <XAxis
-            dataKey="month"
-            {...AXIS}
-            tickFormatter={formatMonth}
-            padding={{ left: 12, right: 12 }}
-          />
-          <YAxis
-            width={44}
-            {...AXIS}
-            domain={[(min: number) => Math.floor((min - 0.02) * 50) / 50, 1]}
-            tickFormatter={(v: number) => v.toFixed(2)}
-          />
-          <ChartTip
-            cursor={{ stroke: "var(--color-muted-foreground)", strokeWidth: 1 }}
-            content={
-              <ChartTooltip title={(l) => `${t(TREND_LABELS[metric])} · ${formatMonth(l ?? "")}`} />
-            }
-          />
-          {models.map((m, i) => {
-            const active = m.id === selectedId;
-            return (
-              <Line
-                key={`${m.id}-${metric}`}
-                type="monotone"
-                dataKey={m.id}
-                name={m.name}
-                stroke={modelColor(models, m.id)}
-                strokeWidth={active ? 3 : 1.75}
-                strokeOpacity={active ? 1 : 0.45}
-                dot={{
-                  r: active ? 4 : 3,
-                  strokeWidth: 2,
-                  stroke: "var(--color-card)",
-                  fill: modelColor(models, m.id),
-                }}
-                activeDot={{ r: 6, stroke: "var(--color-card)", strokeWidth: 2 }}
-                {...ANIMATION}
-                animationBegin={i * 150}
+      <div className="overflow-x-auto">
+        <div className="min-w-[560px]">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart
+              data={data}
+              margin={{ top: 10, right: 8, bottom: 4, left: 4 }}
+              barGap={2}
+              barCategoryGap="24%"
+            >
+              <CartesianGrid vertical={false} stroke="var(--color-border)" />
+              <XAxis dataKey="model" {...AXIS} interval={0} />
+              <YAxis width={40} domain={[0, 1]} ticks={UNIT_TICKS} {...AXIS} />
+              <ReferenceLine
+                y={0.5}
+                stroke="var(--color-muted-foreground)"
+                strokeOpacity={0.45}
+                strokeDasharray="4 4"
+                label={{ value: t("chart.random"), position: "insideTopRight", ...AXIS_LABEL }}
               />
-            );
-          })}
-        </LineChart>
-      </ResponsiveContainer>
+              <ChartTip
+                cursor={{ fill: "var(--color-muted)", fillOpacity: 0.5 }}
+                content={<ChartTooltip title={(l) => String(l).replace("▸ ", "")} />}
+              />
+              {(["Altur", "AlternativeData"] as const).map((dataset, i) => (
+                <Bar
+                  key={`${dataset}-${metric}`}
+                  dataKey={dataset}
+                  name={dataset === "Altur" ? t("model.datasetCalls") : t("model.datasetClips")}
+                  fill={DATASET_COLORS[dataset]}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={28}
+                  {...ANIMATION}
+                  animationBegin={i * 150}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }
 
 // ── Comparación de modelos ───────────────────────────────────────────────────
 
-const COMPARE_METRICS = ["accuracy", "precision", "recall", "f1", "auc", "mcc"] as const;
+const COMPARE_METRICS = [
+  "balancedAccuracy",
+  "auc",
+  "accuracy",
+  "precision",
+  "recall",
+  "f1",
+] as const;
+const COMPARE_LABELS: Record<(typeof COMPARE_METRICS)[number], TKey> = {
+  balancedAccuracy: "metric.balanced",
+  auc: "metric.auc",
+  accuracy: "metric.accuracy",
+  precision: "metric.precision",
+  recall: "metric.recall",
+  f1: "metric.f1",
+};
 
-export function CompareChart({ models, selectedId }: { models: ModelInfo[]; selectedId: string }) {
+export function CompareChart({
+  models,
+  selectedId,
+  dataset,
+}: {
+  models: ModelInfo[];
+  selectedId: string;
+  dataset: ModelDataset;
+}) {
   const { t } = useI18n();
   const [view, setView] = useState<"chart" | "table">("chart");
 
   const derived = useMemo(
-    () => models.map((m) => ({ model: m, d: deriveMetrics(m.metrics) })),
-    [models],
+    () => models.map((m) => ({ model: m, d: deriveMetrics(evaluationFor(m, dataset)) })),
+    [models, dataset],
   );
+
   const data = useMemo(
     () =>
-      COMPARE_METRICS.map((key) => {
-        const row: Record<string, string | number> = { metric: t(`metric.${key}` as TKey) };
-        for (const { model, d } of derived) row[model.id] = Number(d[key].toFixed(4));
+      COMPARE_METRICS.filter((key) => derived.some(({ d }) => d[key] !== null)).map((key) => {
+        const row: Record<string, string | number> = { metric: t(COMPARE_LABELS[key]) };
+        for (const { model, d } of derived) {
+          const value = d[key];
+          if (value !== null) row[model.id] = Number(value.toFixed(4));
+        }
         return row;
       }),
     [derived, t],
@@ -576,35 +630,39 @@ export function CompareChart({ models, selectedId }: { models: ModelInfo[]; sele
       </div>
 
       {view === "chart" ? (
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart
-            data={data}
-            margin={{ top: 10, right: 8, bottom: 4, left: 4 }}
-            barGap={2}
-            barCategoryGap="22%"
-          >
-            <CartesianGrid vertical={false} stroke="var(--color-border)" />
-            <XAxis dataKey="metric" {...AXIS} />
-            <YAxis width={40} domain={[0, 1]} ticks={UNIT_TICKS} {...AXIS} />
-            <ChartTip
-              cursor={{ fill: "var(--color-muted)", fillOpacity: 0.5 }}
-              content={<ChartTooltip title={(l) => String(l)} />}
-            />
-            {models.map((m, i) => (
-              <Bar
-                key={m.id}
-                dataKey={m.id}
-                name={m.name}
-                fill={modelColor(models, m.id)}
-                fillOpacity={m.id === selectedId ? 1 : 0.5}
-                radius={[4, 4, 0, 0]}
-                maxBarSize={30}
-                {...ANIMATION}
-                animationBegin={i * 120}
-              />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
+        <div className="overflow-x-auto">
+          <div className="min-w-[560px]">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart
+                data={data}
+                margin={{ top: 10, right: 8, bottom: 4, left: 4 }}
+                barGap={2}
+                barCategoryGap="18%"
+              >
+                <CartesianGrid vertical={false} stroke="var(--color-border)" />
+                <XAxis dataKey="metric" {...AXIS} />
+                <YAxis width={40} domain={[0, 1]} ticks={UNIT_TICKS} {...AXIS} />
+                <ChartTip
+                  cursor={{ fill: "var(--color-muted)", fillOpacity: 0.5 }}
+                  content={<ChartTooltip title={(l) => String(l)} />}
+                />
+                {models.map((m, i) => (
+                  <Bar
+                    key={`${m.id}-${dataset}`}
+                    dataKey={m.id}
+                    name={m.name}
+                    fill={modelColor(models, m.id)}
+                    fillOpacity={m.id === selectedId ? 1 : 0.65}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={22}
+                    {...ANIMATION}
+                    animationBegin={i * 80}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
           <Table>
@@ -624,7 +682,7 @@ export function CompareChart({ models, selectedId }: { models: ModelInfo[]; sele
                   <TableCell className="font-medium">{row["metric"]}</TableCell>
                   {models.map((m) => (
                     <TableCell key={m.id} className="text-right font-mono tabular-nums">
-                      {Number(row[m.id]).toFixed(3)}
+                      {row[m.id] === undefined ? "—" : Number(row[m.id]).toFixed(3)}
                     </TableCell>
                   ))}
                 </TableRow>

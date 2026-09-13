@@ -1,28 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { DetectionResult } from "@/lib/detection";
+
+import { MAX_WAV_BYTES } from "@/lib/detection";
+import { detectionErrorResponse, jsonResponse, runDetection } from "@/lib/model-api";
+import { bytesToBase64 } from "@/lib/wav";
 
 /**
- * POST /api/public/detect/audio
- * Recibe un archivo de audio (multipart/form-data, campo `file`).
+ * POST /api/public/detect/audio?detector=baseline|w2v2-aasist
+ * multipart/form-data con `file` (WAV estéreo 8 kHz PCM16) y `call_id` opcional.
  *
- * ─────────────────────────────────────────────────────────────────────────────
- * CÓMO CONECTAR EL MODELO REAL
- * ─────────────────────────────────────────────────────────────────────────────
- * Reemplazar el bloque `SIMULACIÓN` por el reenvío del archivo al backend:
- *
- *   const base = process.env["MODEL_API_URL"]!;  // leer dentro del handler
- *   const key = process.env["MODEL_API_KEY"]!;
- *   const upstream = await fetch(`${base}/predict/audio`, {
- *     method: "POST",
- *     headers: { Authorization: `Bearer ${key}` }, // sin Content-Type: lo pone FormData
- *     body: form,                                   // el mismo FormData recibido
- *   });
- *   const prediction = await upstream.json();
- *   // se espera { is_synthetic: boolean, confidence: number (0-1) }
- * ─────────────────────────────────────────────────────────────────────────────
+ * El sitio convierte el WAV a base64 y usa el mismo flujo que /api/public/detect.
  */
-const MAX_BYTES = 25 * 1024 * 1024;
-
 export const Route = createFileRoute("/api/public/detect/audio")({
   server: {
     handlers: {
@@ -31,39 +18,40 @@ export const Route = createFileRoute("/api/public/detect/audio")({
         try {
           form = await request.formData();
         } catch {
-          return Response.json({ error: "Se esperaba multipart/form-data" }, { status: 400 });
+          return jsonResponse({ error: "Se esperaba multipart/form-data" }, 400);
         }
 
         const file = form.get("file");
         if (!(file instanceof File)) {
-          return Response.json({ error: "Falta el archivo `file`" }, { status: 400 });
+          return jsonResponse({ error: "Falta el archivo `file`" }, 400);
         }
-        if (file.size > MAX_BYTES) {
-          return Response.json({ error: "El archivo supera 25 MB" }, { status: 413 });
+        if (file.size > MAX_WAV_BYTES) {
+          const limitMb = (MAX_WAV_BYTES / 1024 / 1024).toFixed(0);
+          return jsonResponse({ error: `El WAV supera ${limitMb} MB` }, 413);
         }
 
-        const model = new URL(request.url).searchParams.get("model") ?? "voxguard-v2";
-        const started = Date.now();
+        const rawCallId = form.get("call_id");
+        const callId =
+          (typeof rawCallId === "string" && rawCallId.trim()) ||
+          file.name.replace(/\.[^.]+$/, "") ||
+          "upload";
 
-        // ── SIMULACIÓN (reemplazar por el reenvío al modelo real) ──────────────
-        await new Promise((r) => setTimeout(r, 900));
-        const seed = file.size + file.name.length;
-        const rand = ((seed * 9301 + 49297) % 233280) / 233280;
-        const is_synthetic = rand > 0.5;
-        const confidence = Number((0.55 + rand * 0.44).toFixed(4));
-        // ───────────────────────────────────────────────────────────────────────
-
-        const result: DetectionResult = {
-          call_id: file.name,
-          is_synthetic,
-          confidence,
-          model,
-          latency_ms: Date.now() - started,
-          received_at: new Date().toISOString(),
-          source: "upload",
-        };
-
-        return Response.json(result);
+        const wavBytes = new Uint8Array(await file.arrayBuffer());
+        const url = new URL(request.url);
+        try {
+          const result = await runDetection({
+            callId,
+            audioBase64: bytesToBase64(wavBytes),
+            wavBytes,
+            detector: url.searchParams.get("detector") ?? url.searchParams.get("model"),
+            inputType: "audio_upload",
+            source: "upload",
+            fileName: file.name,
+          });
+          return jsonResponse(result);
+        } catch (error) {
+          return detectionErrorResponse(error);
+        }
       },
     },
   },

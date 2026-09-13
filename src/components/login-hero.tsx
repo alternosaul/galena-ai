@@ -13,10 +13,11 @@ const EQ_BARS = [
 
 const FEATURES: TKey[] = ["hero.feature1", "hero.feature2", "hero.feature3"];
 
+// Los 3 mejores detectores (ver src/lib/detectors.data.ts).
 const HERO_MODELS = [
-  { name: "VoxGuard", version: "2.4.1", color: "#ff8a4c" },
-  { name: "VoxGuard Lite", version: "1.8.0", color: "#6fb6e0" },
-  { name: "Prosody-X", version: "0.9.3", color: "#f0c14b" },
+  { name: "Everest", rank: 1, color: "#ff8a4c" },
+  { name: "Fuji", rank: 2, color: "#6fb6e0" },
+  { name: "Mont Blanc", rank: 3, color: "#f0c14b" },
 ];
 
 /** Mitad derecha del login: degradado de marca con bento de tarjetas "liquid glass". */
@@ -66,7 +67,7 @@ export function LoginHero() {
                   </span>
                 </CardLabel>
                 <div className="mt-3 flex items-center justify-between gap-2">
-                  <span className="font-mono text-sm text-white/90">call_10293</span>
+                  <span className="font-mono text-sm text-white/90">call_0a9c5462</span>
                   <span className="rounded-full border border-emerald-200/40 bg-emerald-400/25 px-2.5 py-0.5 text-xs font-semibold">
                     {t("class.human")}
                   </span>
@@ -81,9 +82,10 @@ export function LoginHero() {
                   ))}
                 </div>
                 <div className="mt-auto flex items-center gap-3 pt-4">
-                  <span className="text-2xl font-semibold">0.887</span>
+                  {/* confidence = P(sintético): una llamada humana tiene un valor bajo. */}
+                  <span className="text-2xl font-semibold">0.103</span>
                   <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
-                    <span className="block h-full w-[88.7%] rounded-full bg-emerald-300" />
+                    <span className="block h-full w-[10.3%] rounded-full bg-emerald-300" />
                   </span>
                 </div>
               </GlassCard>
@@ -105,7 +107,7 @@ export function LoginHero() {
                         style={{ background: m.color }}
                       />
                       <span className="truncate font-medium">{m.name}</span>
-                      <span className="ml-auto font-mono text-xs text-white/65">v{m.version}</span>
+                      <span className="ml-auto font-mono text-xs text-white/65">#{m.rank}</span>
                     </li>
                   ))}
                 </ul>
@@ -115,9 +117,10 @@ export function LoginHero() {
             <Enter delay={350}>
               <GlassCard>
                 <dl className="flex h-full flex-col justify-between gap-3">
-                  <Stat label={t("hero.accuracy")} value="95.0%" />
-                  <Stat label="AUC-ROC" value="0.984" />
-                  <Stat label={t("hero.latency")} value="312 ms" />
+                  {/* Everest en datos no vistos (MODELS_FINAL_COMPARISON.md). */}
+                  <Stat label="AUC · Altur" value="1.000" />
+                  <Stat label="AUC · AltData" value="0.903" />
+                  <Stat label={t("metric.fpr")} value="5.2%" />
                 </dl>
               </GlassCard>
             </Enter>

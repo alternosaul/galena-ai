@@ -3,42 +3,35 @@ import type { DetectionResult } from "./detection";
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * CAPA DE HISTORIAL (TigerData)
+ * CAPA DE HISTORIAL
  * ─────────────────────────────────────────────────────────────────────────────
  * Hoy el historial vive solo en memoria del navegador (se pierde al recargar)
  * y arranca con registros de ejemplo para poder visualizar la tabla.
  *
- * CÓMO CONECTAR TIGERDATA CUANDO LA BASE DE DATOS ESTÉ LISTA:
+ * CÓMO CONECTAR SUPABASE (tabla public.detections, ver supabase/migrations):
  *
- * 1. Guardar la cadena de conexión como secreto del proyecto:
- *      TIGERDATA_URL  (ej. postgres://user:pass@host:5432/db?sslmode=require)
+ * 1. Variables de entorno del servidor: SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY
+ *    (mientras la autenticación sea simulada; después, la sesión del usuario + RLS).
+ *    NUNCA uses la service role key en el navegador.
  *
- * 2. Crear `src/lib/history.functions.ts` con dos server functions
- *    (TanStack `createServerFn`) que hablen con TigerData desde el servidor.
- *    NUNCA conectes a la base de datos desde el navegador.
+ * 2. Crear server functions (TanStack `createServerFn`):
+ *      saveDetection  → insert en detections (sin audio_base64: la tabla lo rechaza)
+ *      listDetections → select * from detections order by created_at desc limit 200
+ *    Tipos generados en src/lib/database.types.ts.
  *
- *      export const saveDetection = createServerFn({ method: "POST" })
- *        .inputValidator((d: DetectionResult) => detectionResultSchema.parse(d))
- *        .handler(async ({ data }) => {
- *          const url = process.env["TIGERDATA_URL"]!; // leer dentro del handler
- *          // INSERT INTO detections (call_id, is_synthetic, confidence, model,
- *          //   latency_ms, received_at, source, duration_sec) VALUES (...)
- *        });
- *
- *      export const listDetections = createServerFn({ method: "GET" })
- *        .handler(async () => {
- *          // SELECT * FROM detections ORDER BY received_at DESC LIMIT 200
- *        });
- *
- * 3. Sustituir el cuerpo de `addDetection` por una llamada a `saveDetection`
- *    y alimentar `useDetectionHistory` con `listDetections` vía TanStack Query.
+ * 3. Sustituir el cuerpo de `addDetection` por `saveDetection` y alimentar
+ *    `useDetectionHistory` con `listDetections` vía TanStack Query.
  *    Eliminar `sampleHistory()`. La interfaz pública de este archivo no cambia.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 const SAMPLE_BASE = Date.parse("2026-09-12T15:30:00Z");
-const SAMPLE_MODELS = ["voxguard-v2", "voxguard-lite", "prosody-x"];
-const SAMPLE_SOURCES = ["inbound-pstn", "outbound-sip", "webrtc", "upload"];
+const SAMPLE_DETECTORS = [
+  { id: "everest", threshold: 0.592, latency: [900, 2600] },
+  { id: "fuji", threshold: 0.7, latency: [250, 800] },
+  { id: "montblanc", threshold: 0.7, latency: [250, 800] },
+] as const;
+const SAMPLE_SOURCES = ["api", "upload"];
 
 /** Pseudoaleatorio determinista: mismo resultado en servidor y cliente. */
 function pseudo(n: number) {
@@ -50,16 +43,23 @@ function sampleHistory(): DetectionResult[] {
   return Array.from({ length: 24 }, (_, i) => {
     const r1 = pseudo(i + 1);
     const r2 = pseudo(i * 7 + 3);
-    const model = SAMPLE_MODELS[i % SAMPLE_MODELS.length] ?? "voxguard-v2";
+    const detector = SAMPLE_DETECTORS[i % SAMPLE_DETECTORS.length] ?? SAMPLE_DETECTORS[0];
+    const confidence = Number(r2.toFixed(4));
+    const [minLatency, maxLatency] = detector.latency;
     return {
-      call_id: `call_${10290 - i * 3}`,
-      is_synthetic: r1 > 0.55,
-      confidence: Number((0.55 + r2 * 0.44).toFixed(4)),
-      model,
-      latency_ms: Math.round((model === "voxguard-lite" ? 60 : 250) + r1 * 320),
+      call_id: `call_${Math.floor(r1 * 0xffffffffffff)
+        .toString(16)
+        .padStart(12, "0")}`,
+      is_synthetic: confidence >= detector.threshold,
+      confidence,
+      model: detector.id,
+      threshold: detector.threshold,
+      latency_ms: Math.round(minLatency + r1 * (maxLatency - minLatency)),
       received_at: new Date(SAMPLE_BASE - i * 7 * 60_000 - Math.round(r2 * 120_000)).toISOString(),
-      source: SAMPLE_SOURCES[(i * 5) % SAMPLE_SOURCES.length] ?? "upload",
+      source: SAMPLE_SOURCES[i % SAMPLE_SOURCES.length] ?? "api",
       duration_sec: Number((20 + r2 * 140).toFixed(1)),
+      sample_rate: 8000,
+      channels: 2,
     };
   });
 }
@@ -72,13 +72,13 @@ function emit() {
 }
 
 export function addDetection(result: DetectionResult) {
-  // TODO(TigerData): reemplazar por `await saveDetection({ data: result })`
+  // TODO(Supabase): reemplazar por `await saveDetection({ data: result })`
   history = [result, ...history].slice(0, 200);
   emit();
 }
 
 export function clearHistory() {
-  // TODO(TigerData): reemplazar por un DELETE server-side si se requiere
+  // TODO(Supabase): reemplazar por un DELETE server-side si se requiere
   history = [];
   emit();
 }
@@ -93,6 +93,6 @@ function subscribe(listener: () => void) {
 }
 
 export function useDetectionHistory() {
-  // TODO(TigerData): cambiar por useQuery({ queryKey: ["detections"], queryFn: listDetections })
+  // TODO(Supabase): cambiar por useQuery({ queryKey: ["detections"], queryFn: listDetections })
   return useSyncExternalStore(subscribe, getHistory, getHistory);
 }

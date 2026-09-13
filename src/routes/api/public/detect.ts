@@ -1,80 +1,65 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { callPayloadSchema, type DetectionResult } from "@/lib/detection";
+
+import { detectRequestSchema, MAX_JSON_BYTES } from "@/lib/detection";
+import { detectionErrorResponse, jsonResponse, runDetection } from "@/lib/model-api";
+import { base64ToBytes } from "@/lib/wav";
 
 /**
- * POST /api/public/detect
- * Recibe el JSON de una llamada y devuelve si fue hecha por una IA o un humano.
+ * POST /api/public/detect?detector=baseline|w2v2-aasist
  *
- * ─────────────────────────────────────────────────────────────────────────────
- * CÓMO CONECTAR EL MODELO REAL
- * ─────────────────────────────────────────────────────────────────────────────
- * 1. Guardar como secretos del proyecto:
- *      MODEL_API_URL   (ej. https://mi-backend.com)
- *      MODEL_API_KEY   (token del backend)
- * 2. Sustituir el bloque `SIMULACIÓN` por:
+ * Mismo contrato que POST /detect de la API galena-live:
+ *   { "call_id": "…", "audio_base64": "<WAV completo en base64>", "sample_rate": 8000, "channels": 2 }
  *
- *      const base = process.env["MODEL_API_URL"]!;   // leer dentro del handler
- *      const key = process.env["MODEL_API_KEY"]!;
- *      const upstream = await fetch(`${base}/predict`, {
- *        method: "POST",
- *        headers: {
- *          "Content-Type": "application/json",
- *          Authorization: `Bearer ${key}`,
- *        },
- *        body: JSON.stringify({ model, ...payload }),
- *      });
- *      if (!upstream.ok) {
- *        return Response.json({ error: "Modelo no disponible" }, { status: 502 });
- *      }
- *      const prediction = await upstream.json();
- *      // se espera { is_synthetic: boolean, confidence: number (0-1) }
- *
- * 3. Mantener la misma forma de respuesta (DetectionResult) para no tocar la UI.
- * ─────────────────────────────────────────────────────────────────────────────
+ * El sitio valida el JSON y la cabecera del WAV, reenvía la petición a MODEL_API_URL y
+ * responde con DetectionResult. Sin MODEL_API_URL responde en modo simulado (simulated: true).
  */
 export const Route = createFileRoute("/api/public/detect")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        if (Number(request.headers.get("content-length") ?? "0") > MAX_JSON_BYTES) {
+          return jsonResponse({ error: "El JSON debe pesar como máximo 16 MiB" }, 413);
+        }
+
         let body: unknown;
         try {
           body = await request.json();
         } catch {
-          return Response.json({ error: "JSON inválido" }, { status: 400 });
+          return jsonResponse({ error: "JSON inválido" }, 400);
         }
 
-        const parsed = callPayloadSchema.safeParse(body);
+        const parsed = detectRequestSchema.safeParse(body);
         if (!parsed.success) {
-          return Response.json(
-            { error: "Payload inválido", issues: parsed.error.issues },
-            { status: 400 },
+          return jsonResponse(
+            {
+              error: "Petición inválida",
+              detail: parsed.error.issues.map((issue) => ({
+                field: issue.path.join("."),
+                message: issue.message,
+              })),
+            },
+            400,
           );
         }
-        const payload = parsed.data;
-        const model = new URL(request.url).searchParams.get("model") ?? "voxguard-v2";
 
-        const started = Date.now();
+        const wavBytes = base64ToBytes(parsed.data.audio_base64);
+        if (!wavBytes)
+          return jsonResponse({ error: "audio_base64 no contiene base64 válido" }, 400);
 
-        // ── SIMULACIÓN (reemplazar por la llamada al modelo real) ──────────────
-        await new Promise((r) => setTimeout(r, 600));
-        const seed = [...payload.call_id].reduce((a, c) => a + c.charCodeAt(0), 0);
-        const rand = ((seed * 9301 + 49297) % 233280) / 233280;
-        const is_synthetic = rand > 0.5;
-        const confidence = Number((0.55 + rand * 0.44).toFixed(4));
-        // ───────────────────────────────────────────────────────────────────────
-
-        const result: DetectionResult = {
-          call_id: payload.call_id,
-          is_synthetic,
-          confidence,
-          model,
-          latency_ms: Date.now() - started,
-          received_at: new Date().toISOString(),
-          ...(payload.source ? { source: payload.source } : {}),
-          ...(payload.duration_sec !== undefined ? { duration_sec: payload.duration_sec } : {}),
-        };
-
-        return Response.json(result);
+        const url = new URL(request.url);
+        try {
+          const result = await runDetection({
+            callId: parsed.data.call_id,
+            audioBase64: parsed.data.audio_base64,
+            wavBytes,
+            detector: url.searchParams.get("detector") ?? url.searchParams.get("model"),
+            inputType: "json",
+            source: parsed.data.source ?? "api",
+          });
+          return jsonResponse(result);
+        } catch (error) {
+          return detectionErrorResponse(error);
+        }
       },
       OPTIONS: async () =>
         new Response(null, {

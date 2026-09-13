@@ -2,7 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Check, Copy, Eye, EyeOff, Loader2, PlugZap, RotateCcw, Save, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
+  FlaskConical,
+  Loader2,
+  PlugZap,
+  RotateCcw,
+  Save,
+  X,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +37,7 @@ import {
 } from "@/lib/api-settings";
 import { EXAMPLE_PAYLOAD } from "@/lib/detection";
 import { useI18n, type TKey } from "@/lib/i18n";
+import type { ModelApiHealth } from "@/lib/model-api";
 import { modelsQueryOptions } from "@/lib/models-query";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +45,7 @@ export const Route = createFileRoute("/api-config")({
   head: () => ({
     meta: [
       { title: "API — VoxGuard" },
-      { name: "description", content: "Configuración de la conexión al modelo." },
+      { name: "description", content: "Configuración de la conexión a la API de modelos." },
     ],
   }),
   component: ApiConfigPage,
@@ -43,21 +55,29 @@ const ENDPOINTS: { method: "GET" | "POST"; path: string; desc: TKey }[] = [
   { method: "POST", path: "/api/public/detect", desc: "ep.detect" },
   { method: "POST", path: "/api/public/detect/audio", desc: "ep.audio" },
   { method: "GET", path: "/api/public/models", desc: "ep.models" },
+  { method: "GET", path: "/api/public/health", desc: "ep.health" },
 ];
 
 const EXAMPLE_RESPONSE = `{
-  "call_id": "call_10293",
-  "is_synthetic": true,
-  "confidence": 0.8108,
-  "model": "voxguard-v2",
-  "latency_ms": 602,
-  "received_at": "2026-09-12T22:48:16.189Z",
-  "source": "inbound-pstn",
-  "duration_sec": 74.5
+  "call_id": "call_0a9c546208d1",
+  "is_synthetic": false,
+  "confidence": 0.1034,
+  "model": "baseline",
+  "threshold": 0.7,
+  "detection_id": "2f1c7d0e-5a8b-4f7e-9d1a-3c6b8e2f4a10",
+  "latency_ms": 842,
+  "received_at": "2026-09-13T18:22:05.114Z",
+  "source": "api",
+  "duration_sec": 74.5,
+  "sample_rate": 8000,
+  "channels": 2
 }`;
 
 type TestState =
-  { status: "idle" } | { status: "testing" } | { status: "ok"; ms: number } | { status: "fail" };
+  | { status: "idle" }
+  | { status: "testing" }
+  | { status: "ok"; ms: number; mode: ModelApiHealth["mode"]; detectors: string[] }
+  | { status: "fail"; message: string | null };
 
 function ApiConfigPage() {
   const { t } = useI18n();
@@ -92,21 +112,35 @@ function ApiConfigPage() {
     setTest({ status: "testing" });
     const started = performance.now();
     try {
-      // TODO(backend): exponer un endpoint del servidor que pruebe `${MODEL_API_URL}/health`.
-      // Por ahora se prueba el endpoint propio de la app, que responde con datos simulados.
-      const res = await fetch("/api/public/models", {
+      const res = await fetch("/api/public/health", {
         signal: AbortSignal.timeout(settings.timeoutSec * 1000),
       });
-      if (!res.ok) throw new Error(String(res.status));
-      setTest({ status: "ok", ms: Math.round(performance.now() - started) });
+      const health = (await res.json()) as ModelApiHealth;
+      if (!res.ok || !health.ok) {
+        setTest({ status: "fail", message: health.error });
+        return;
+      }
+      setTest({
+        status: "ok",
+        ms: Math.round(performance.now() - started),
+        mode: health.mode,
+        detectors: health.available_detectors,
+      });
     } catch {
-      setTest({ status: "fail" });
+      setTest({ status: "fail", message: null });
     }
   }
 
-  const curl = `curl -X POST "${origin}/api/public/detect?model=${settings.defaultModel}" \\
+  const detectorName = (id: string) => models.find((m) => m.id === id)?.name ?? id;
+
+  const curl = `# JSON (mismo contrato que la API de modelos)
+curl -X POST "${origin}/api/public/detect?detector=${settings.defaultModel}" \\
   -H "Content-Type: application/json" \\
-  -d @call.json`;
+  -d @call.json
+
+# Archivo WAV (estéreo, 8 kHz, PCM 16 bits)
+curl -X POST "${origin}/api/public/detect/audio?detector=${settings.defaultModel}" \\
+  -F "file=@call_0a9c546208d1.wav"`;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -220,6 +254,23 @@ function ApiConfigPage() {
               </Field>
             </div>
 
+            {test.status === "ok" && (
+              <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs animate-in fade-in-0">
+                <p>
+                  <span className="text-muted-foreground">{t("api.healthDetectors")}:</span>{" "}
+                  {test.detectors.length ? test.detectors.map(detectorName).join(", ") : "—"}
+                </p>
+                {test.mode === "simulated" && (
+                  <p className="mt-1 text-muted-foreground">{t("api.notConfigured")}</p>
+                )}
+              </div>
+            )}
+            {test.status === "fail" && test.message && (
+              <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {test.message}
+              </p>
+            )}
+
             <div className="flex flex-wrap gap-2 border-t border-border pt-5">
               <Button onClick={save}>
                 <Save className="mr-2 h-4 w-4" />
@@ -327,6 +378,16 @@ function Field({
 
 function TestBadge({ state }: { state: TestState }) {
   const { t } = useI18n();
+  if (state.status === "ok" && state.mode === "simulated")
+    return (
+      <Badge
+        variant="outline"
+        className="gap-1 border-primary/40 text-primary animate-in fade-in-0 zoom-in-95"
+      >
+        <FlaskConical className="h-3 w-3" />
+        {t("api.modeSimulated")}
+      </Badge>
+    );
   if (state.status === "ok")
     return (
       <Badge className="gap-1 bg-success text-success-foreground animate-in fade-in-0 zoom-in-95">
@@ -395,7 +456,7 @@ function copyWithTextarea(text: string) {
 function CodeBlock({ code }: { code: string }) {
   return (
     <div className="relative">
-      <pre className="overflow-x-auto rounded-md bg-muted p-4 pr-12 font-mono text-xs leading-relaxed">
+      <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md bg-muted p-4 pr-12 font-mono text-xs leading-relaxed [overflow-wrap:anywhere]">
         {code}
       </pre>
       <div className="absolute right-2 top-2">

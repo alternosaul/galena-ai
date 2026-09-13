@@ -1,23 +1,31 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { MODELS } from "@/lib/models.data";
+
+import type { ModelInfo, ModelsResponse } from "@/lib/detection";
+import { DETECTORS } from "@/lib/detectors.data";
+import { getModelApiHealth } from "@/lib/model-api";
 
 /**
  * GET /api/public/models
- * Catálogo de modelos y sus métricas de rendimiento.
+ * Catálogo de detectores con sus métricas y, si la API de modelos está conectada,
+ * cuáles tienen pesos cargados (según GET /health) y sus umbrales reales.
  *
- * CUANDO EL BACKEND REAL ESTÉ LISTO, sustituir por:
- *
- *   const base = process.env["MODEL_API_URL"]!;   // leer dentro del handler
- *   const key = process.env["MODEL_API_KEY"]!;
- *   const res = await fetch(`${base}/models`, {
- *     headers: { Authorization: `Bearer ${key}` },
- *   });
- *   return Response.json(await res.json());
+ * TODO(Supabase): leer el catálogo de detectors + detector_evaluations.
  */
 export const Route = createFileRoute("/api/public/models")({
   server: {
     handlers: {
-      GET: async () => Response.json({ models: MODELS }),
+      GET: async () => {
+        const health = await getModelApiHealth();
+        const models: ModelInfo[] = DETECTORS.map((detector) => ({
+          ...detector,
+          threshold: health.thresholds[detector.id] ?? detector.threshold,
+          available:
+            health.mode === "live"
+              ? health.ok && health.available_detectors.includes(detector.id)
+              : null,
+        }));
+        return Response.json({ mode: health.mode, models } satisfies ModelsResponse);
+      },
     },
   },
 });

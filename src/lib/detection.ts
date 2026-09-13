@@ -1,63 +1,118 @@
 import { z } from "zod";
 import type { LocalizedText } from "./i18n";
+import { silentWavBase64 } from "./wav";
 
 /**
- * Tipos compartidos entre el frontend y los endpoints de la app.
- * Cuando se conecte el modelo real, esta forma debe coincidir con la
- * respuesta del backend (ver src/routes/api/public/detect.ts).
+ * Contratos compartidos entre el frontend, las rutas /api/public/* del sitio y la
+ * API de modelos (services/model-api, POST /detect). Ver src/lib/model-api.ts.
  */
 
-export const callPayloadSchema = z.object({
-  call_id: z.string().min(1),
-  duration_sec: z.number().nonnegative().optional(),
-  source: z.string().optional(),
-  language: z.string().optional(),
-  transcript: z.string().optional(),
-  audio_url: z.string().url().optional(),
-  metadata: z.record(z.unknown()).optional(),
+/** Límite de la API de modelos para el cuerpo JSON (16 MiB). */
+export const MAX_JSON_BYTES = 16 * 1024 * 1024;
+/** Tamaño máximo de un WAV que cabe en ese JSON una vez convertido a base64. */
+export const MAX_WAV_BYTES = Math.floor(((MAX_JSON_BYTES - 1024) * 3) / 4);
+
+/** Cuerpo de POST /detect (mismo contrato que la API de modelos; `source` es propio del sitio). */
+export const detectRequestSchema = z.object({
+  call_id: z.string().trim().min(1, "call_id debe ser texto no vacío"),
+  audio_base64: z.string().min(1).max(MAX_JSON_BYTES),
+  sample_rate: z.literal(8000),
+  channels: z.literal(2),
+  source: z.string().max(100).optional(),
 });
 
-export type CallPayload = z.infer<typeof callPayloadSchema>;
+export type DetectRequest = z.infer<typeof detectRequestSchema>;
 
 export const detectionResultSchema = z.object({
   call_id: z.string(),
   is_synthetic: z.boolean(),
+  /** P(voz sintética) según el detector, entre 0 y 1. */
   confidence: z.number().min(0).max(1),
+  /** id del detector: everest | fuji | montblanc | galena-full | galena-client-only | acoustic-baseline */
   model: z.string(),
+  threshold: z.number().min(0).max(1).optional(),
+  /** Header X-Detection-ID de la API de modelos. */
+  detection_id: z.string().optional(),
   latency_ms: z.number(),
   received_at: z.string(),
   source: z.string().optional(),
+  file_name: z.string().optional(),
   duration_sec: z.number().optional(),
+  sample_rate: z.number().optional(),
+  channels: z.number().optional(),
+  /** true cuando MODEL_API_URL no está configurada y el resultado es de demostración. */
+  simulated: z.boolean().optional(),
 });
 
 export type DetectionResult = z.infer<typeof detectionResultSchema>;
 
-/**
- * Las métricas escalares (exactitud, precisión, recall, F1, MCC, EER…) se
- * calculan en el frontend a partir de `confusion` y `auc` (src/lib/metrics.ts).
- */
-export type ModelMetrics = {
-  auc: number;
-  avg_latency_ms: number;
-  confusion: { true_ai: number; false_ai: number; true_human: number; false_human: number };
-  /** `month` en formato ISO YYYY-MM */
-  history: { month: string; accuracy: number; f1: number; auc: number }[];
+export type ConfusionCounts = {
+  true_ai: number;
+  false_ai: number;
+  true_human: number;
+  false_human: number;
 };
 
+/** Conjuntos de evaluación (datos no vistos por cada modelo). */
+export type ModelDataset = "Altur" | "AlternativeData";
+
+/** Evaluación de un detector (tabla detector_evaluations en Supabase). */
+export type ModelEvaluation = {
+  dataset: ModelDataset;
+  split: "train" | "val" | "test" | "alternate";
+  evaluated_at: string;
+  sample_count: number;
+  threshold: number;
+  confusion: ConfusionCounts | null;
+  accuracy: number | null;
+  balanced_accuracy: number | null;
+  precision: number | null;
+  f1: number | null;
+  auc: number | null;
+  brier: number | null;
+  latency_p95_ms: number | null;
+  /** Métrica del modelo entrenado solo con train (la versión final se reentrenó con train + val). */
+  train_only_reference: boolean;
+};
+
+/** Detector de la API de modelos (tabla detectors en Supabase). */
 export type ModelInfo = {
   id: string;
   name: string;
+  /** 1–3 para los modelos con nombre de montaña; null para los experimentales. */
+  rank: 1 | 2 | 3 | null;
+  experimental: boolean;
+  family: "galena" | "acoustic";
+  /** Archivo ONNX en services/model-api/final_models. */
+  api_model_name: string;
   version: string;
+  algorithm: LocalizedText;
+  features: LocalizedText;
   description: LocalizedText;
-  status: "active" | "beta" | "deprecated";
   trained_on: LocalizedText;
-  metrics: ModelMetrics;
+  status: "active" | "beta" | "deprecated";
+  threshold: number;
+  is_default: boolean;
+  /** Solo acepta la llamada estéreo completa (usa los turnos del agente). */
+  stereo_only: boolean;
+  /** Según GET /health de la API; null cuando la API no está conectada (modo simulado). */
+  available: boolean | null;
+  evaluations: ModelEvaluation[];
 };
 
-export const EXAMPLE_PAYLOAD = `{
-  "call_id": "call_10293",
-  "duration_sec": 74.5,
-  "source": "inbound-pstn",
-  "language": "es-MX",
-  "transcript": "Buenas tardes, le llamo para confirmar su cita..."
-}`;
+export type ModelsResponse = { mode: "live" | "simulated"; models: ModelInfo[] };
+
+export function evaluationFor(model: ModelInfo, dataset: ModelDataset): ModelEvaluation | null {
+  return model.evaluations.find((e) => e.dataset === dataset) ?? null;
+}
+
+export const EXAMPLE_PAYLOAD = JSON.stringify(
+  {
+    call_id: "call_0a9c546208d1",
+    audio_base64: silentWavBase64(),
+    sample_rate: 8000,
+    channels: 2,
+  },
+  null,
+  2,
+);

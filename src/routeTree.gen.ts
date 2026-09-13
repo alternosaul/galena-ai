@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ModelRouteImport } from './routes/model'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ApiPublicDetectRouteImport } from './routes/api/public/detect'
+import { Route as ApiPublicHealthRouteImport } from './routes/api/public/health'
 import { Route as ApiPublicModelsRouteImport } from './routes/api/public/models'
 import { Route as ApiPublicDetectAudioRouteImport } from './routes/api/public/detect.audio'
 
@@ -54,6 +55,11 @@ const ApiPublicDetectRoute = ApiPublicDetectRouteImport.update({
   path: '/api/public/detect',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHealthRoute = ApiPublicHealthRouteImport.update({
+  id: '/api/public/health',
+  path: '/api/public/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicModelsRoute = ApiPublicModelsRouteImport.update({
   id: '/api/public/models',
   path: '/api/public/models',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/model': typeof ModelRoute
   '/profile': typeof ProfileRoute
   '/api/public/detect': typeof ApiPublicDetectRouteWithChildren
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/api/public/models': typeof ApiPublicModelsRoute
   '/api/public/detect/audio': typeof ApiPublicDetectAudioRoute
 }
@@ -84,6 +91,7 @@ export interface FileRoutesByTo {
   '/model': typeof ModelRoute
   '/profile': typeof ProfileRoute
   '/api/public/detect': typeof ApiPublicDetectRouteWithChildren
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/api/public/models': typeof ApiPublicModelsRoute
   '/api/public/detect/audio': typeof ApiPublicDetectAudioRoute
 }
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/model': typeof ModelRoute
   '/profile': typeof ProfileRoute
   '/api/public/detect': typeof ApiPublicDetectRouteWithChildren
+  '/api/public/health': typeof ApiPublicHealthRoute
   '/api/public/models': typeof ApiPublicModelsRoute
   '/api/public/detect/audio': typeof ApiPublicDetectAudioRoute
 }
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/model'
     | '/profile'
     | '/api/public/detect'
+    | '/api/public/health'
     | '/api/public/models'
     | '/api/public/detect/audio'
   fileRoutesByTo: FileRoutesByTo
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/model'
     | '/profile'
     | '/api/public/detect'
+    | '/api/public/health'
     | '/api/public/models'
     | '/api/public/detect/audio'
   id:
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/model'
     | '/profile'
     | '/api/public/detect'
+    | '/api/public/health'
     | '/api/public/models'
     | '/api/public/detect/audio'
   fileRoutesById: FileRoutesById
@@ -143,6 +155,7 @@ export interface RootRouteChildren {
   ModelRoute: typeof ModelRoute
   ProfileRoute: typeof ProfileRoute
   ApiPublicDetectRoute: typeof ApiPublicDetectRouteWithChildren
+  ApiPublicHealthRoute: typeof ApiPublicHealthRoute
   ApiPublicModelsRoute: typeof ApiPublicModelsRoute
 }
 
@@ -197,6 +210,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicDetectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/health': {
+      id: '/api/public/health'
+      path: '/api/public/health'
+      fullPath: '/api/public/health'
+      preLoaderRoute: typeof ApiPublicHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/models': {
       id: '/api/public/models'
       path: '/api/public/models'
@@ -234,6 +254,7 @@ const rootRouteChildren: RootRouteChildren = {
   ModelRoute: ModelRoute,
   ProfileRoute: ProfileRoute,
   ApiPublicDetectRoute: ApiPublicDetectRouteWithChildren,
+  ApiPublicHealthRoute: ApiPublicHealthRoute,
   ApiPublicModelsRoute: ApiPublicModelsRoute,
 }
 export const routeTree = rootRouteImport
