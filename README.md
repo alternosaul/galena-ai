@@ -1,43 +1,58 @@
-# Call Insight Dashboard
+# Galena AI — VoxGuard
 
-necesito una pagina web construida en react usando componentes de shadcn, usando los siguientes colores #FF671F ; #003049 ; #EAD7D1 ; #0D1117
+Web dashboard that analyzes call data and detects whether the voice is **AI-generated or human**, showing the model's verdict, confidence and performance metrics.
 
-La pagina web recibe requests en json con informacion sobre datos de llamadas busca identificar si la llamada esta echa con un agente de IA o si es humano necesitamos mostrar las estadisticas de ese resultado
+## Features
 
-is_syntethic como bolean (muestra un recuadro verde/rojo/ gris con el texto Human, AI, Loading 
+- **Detector** — submit a call as JSON or upload audio; shows the Human / AI result and a confidence gauge (0–1).
+- **History** — log-style table of recent requests with search, filters, export and detail view.
+- **API** — model connection settings, app endpoints and request/response examples.
+- **Model** — interactive metrics: ROC and precision-recall curves, confusion matrix, score distribution, monthly trend and model comparison.
+- **Account** — login (email, Google, GitHub), user profile, preferences and password change.
+- Spanish / English interface and light / dark themes.
 
-una grafica tipo velocimetro de rojo a verde para mostrar la confianza de 0-1 del resultado del modelo 
+> Model predictions, metrics, history and authentication are currently **mocked** in the frontend.
+> Look for `TODO` comments (e.g. `src/routes/api/public/detect.ts`, `src/lib/auth.tsx`, `src/lib/tigerdata.ts`) to connect the real backend.
 
-(el modelo esta hosteado en el backend)
+## Tech stack
 
-en modelo 
-una graficas de metricas de rendimiento del modelo interactivas (hover con labels) modelo y otras metricas importantes 
-
-
-quiero una barra lateral con acceso a los menus 
-
-Detector - Dashboard principal con la grafica de velocimetro y el lector de confianza, selector de modelo 
-History - Tabla (log-like) con toda la informacion de las ultimas solicitudes
-Api - configuracion de la API al modelo 
-Model - Informacion sobre el/los Modelos
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/ddbb3259-9c4d-402a-9a76-0291e3103920).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+TanStack Start (React 19, SSR) · Vite · Tailwind CSS v4 · shadcn/ui (Radix) · TanStack Query · Recharts · Zod · Nitro (Node server build)
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Requires Node.js 22+.
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+npm install
+npm run dev        # http://localhost:8080
+```
+
+Other scripts:
+
+```sh
+npm run build      # production build → .output/server/index.mjs
+npm run lint
+npm run format
+```
+
+## Production
+
+The build outputs a standalone Node server:
+
+```sh
+npm run build
+PORT=3000 node .output/server/index.mjs
+```
+
+It is deployed behind nginx as a systemd service. Server-side secrets (`MODEL_API_URL`, `MODEL_API_KEY`, `TIGERDATA_URL`) are read from the environment.
+
+## Project structure
+
+```
+src/
+  routes/          file-based routes (pages and /api/public/* endpoints)
+  components/      app components (charts, sidebar, login hero, …)
+  components/ui/   shadcn/ui primitives
+  lib/             i18n, theme, auth, metrics, data helpers
+public/            static assets
 ```
