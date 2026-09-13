@@ -25,8 +25,10 @@ export type DetectRequest = z.infer<typeof detectRequestSchema>;
 export const detectionResultSchema = z.object({
   call_id: z.string(),
   is_synthetic: z.boolean(),
-  /** P(voz sintética) según el detector, entre 0 y 1. */
+  /** Confianza en el veredicto: p_synthetic si is_synthetic, si no 1 − p_synthetic (contrato del juez). */
   confidence: z.number().min(0).max(1),
+  /** P(voz sintética) según el detector, entre 0 y 1. */
+  p_synthetic: z.number().min(0).max(1).optional(),
   /** id del detector: everest | fuji | montblanc | galena-full | galena-client-only | acoustic-baseline */
   model: z.string(),
   threshold: z.number().min(0).max(1).optional(),

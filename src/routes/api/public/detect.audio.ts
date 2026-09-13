@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { MAX_WAV_BYTES } from "@/lib/detection";
+import { saveDetection } from "@/lib/detections.server";
 import { detectionErrorResponse, jsonResponse, runDetection } from "@/lib/model-api";
 import { bytesToBase64 } from "@/lib/wav";
 
@@ -48,6 +49,7 @@ export const Route = createFileRoute("/api/public/detect/audio")({
             source: "upload",
             fileName: file.name,
           });
+          await saveDetection(request, { result, inputType: "audio_upload", wavBytes });
           return jsonResponse(result);
         } catch (error) {
           return detectionErrorResponse(error);

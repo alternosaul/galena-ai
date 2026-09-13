@@ -6,6 +6,10 @@
          {"call_id": "...", "audio_base64": "<WAV en base64>", "sample_rate": 8000, "channels": 2}
     GET  /health
 
+Respuesta de /detect: `p_synthetic` es P(voz sintética) y `is_synthetic = p_synthetic >= threshold`.
+`confidence` es la confianza en ese veredicto (p_synthetic si es sintética, 1 - p_synthetic si es
+humana), que es como la interpreta el juez (scripts/check_endpoint.py).
+
 Sirve los 6 detectores ONNX de `final_models/`. Los extractores de features y los modelos se
 copiaron sin cambios de lamunuwa/galena-live (rama feat/synthetic-voice-detection-models,
 commit 307b538). Cada familia usa su propio extractor y la inferencia reproduce
@@ -130,8 +134,10 @@ class DetectRequest(BaseModel):
 class DetectResponse(BaseModel):
     call_id: str
     is_synthetic: bool
-    confidence: float = Field(description="P(voz sintética), igual que p_synthetic.")
-    p_synthetic: float
+    confidence: float = Field(
+        description="Confianza en el veredicto: p_synthetic si is_synthetic, si no 1 - p_synthetic."
+    )
+    p_synthetic: float = Field(description="P(voz sintética) según el detector.")
     detector: str
     threshold: float
 
@@ -241,7 +247,7 @@ def detect(
     return DetectResponse(
         call_id=payload.call_id,
         is_synthetic=bool(is_synthetic),
-        confidence=round(p, 6),
+        confidence=round(p if is_synthetic else 1.0 - p, 6),
         p_synthetic=round(p, 6),
         detector=detector,
         threshold=model.threshold,

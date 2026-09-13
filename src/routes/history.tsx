@@ -31,7 +31,8 @@ import { ConfidenceGauge } from "@/components/confidence-gauge";
 import { ResultBadge, VerdictPill } from "@/components/result-badge";
 import type { DetectionResult } from "@/lib/detection";
 import { useI18n } from "@/lib/i18n";
-import { clearHistory, useDetectionHistory } from "@/lib/tigerdata";
+import { useAuth } from "@/lib/auth";
+import { useClearHistory, useDetectionHistory } from "@/lib/history";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/history")({
@@ -48,7 +49,10 @@ type Verdict = "all" | "ai" | "human";
 
 function HistoryPage() {
   const { t, locale } = useI18n();
-  const history = useDetectionHistory();
+  const { user } = useAuth();
+  const historyQuery = useDetectionHistory(user?.id);
+  const history = useMemo(() => historyQuery.data ?? [], [historyQuery.data]);
+  const clear = useClearHistory(user?.id);
   const [query, setQuery] = useState("");
   const [verdict, setVerdict] = useState<Verdict>("all");
   const [model, setModel] = useState("all");
@@ -105,7 +109,11 @@ function HistoryPage() {
             <Download className="mr-2 h-4 w-4" />
             {t("history.export")}
           </Button>
-          <Button variant="outline" onClick={clearHistory} disabled={!history.length}>
+          <Button
+            variant="outline"
+            onClick={() => clear.mutate()}
+            disabled={!history.length || clear.isPending}
+          >
             <Trash2 className="mr-2 h-4 w-4" />
             {t("history.clear")}
           </Button>
@@ -212,7 +220,13 @@ function HistoryPage() {
 
             {!filtered.length && (
               <p className="px-6 py-16 text-center text-sm text-muted-foreground">
-                {history.length ? t("history.noMatches") : t("history.empty")}
+                {historyQuery.isPending
+                  ? t("history.loading")
+                  : historyQuery.isError
+                    ? t("history.loadError")
+                    : history.length
+                      ? t("history.noMatches")
+                      : t("history.empty")}
               </p>
             )}
           </div>

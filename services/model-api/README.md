@@ -30,7 +30,9 @@ Content-Type: application/json
 ```
 
 Respuesta: `{"call_id", "is_synthetic", "confidence", "p_synthetic", "detector", "threshold"}` más los
-headers `X-Detection-ID` y `X-Detector`. `confidence` es P(voz sintética), igual que `p_synthetic`.
+headers `X-Detection-ID` y `X-Detector`. `p_synthetic` es P(voz sintética) e
+`is_synthetic = p_synthetic >= threshold`. `confidence` es la confianza en ese veredicto
+(`p_synthetic` si es sintética, `1 - p_synthetic` si es humana), que es como la interpreta el juez.
 
 Errores: 400 (JSON, base64, WAV o detector inválido), 413 (> 16 MiB), 415 (no JSON), 503 (sin plazas de inferencia).
 

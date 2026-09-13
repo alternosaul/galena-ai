@@ -1,32 +1,21 @@
+import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 
+import { getSupabase, setRememberSession } from "./supabase";
+
 /**
- * ─────────────────────────────────────────────────────────────────────────────
- * AUTENTICACIÓN (SIMULADA)
- * ─────────────────────────────────────────────────────────────────────────────
- * Hoy la sesión vive en el navegador: localStorage si el usuario marca
- * "mantener sesión", sessionStorage si no. NUNCA se guardan contraseñas.
- * Cualquier correo válido + contraseña de 8+ caracteres inicia sesión.
- *
- * CÓMO CONECTAR AUTENTICACIÓN REAL:
- * 1. Elegir proveedor (Better Auth, Auth.js, Supabase Auth, Clerk…) y registrar
- *    las apps OAuth de Google y GitHub (GOOGLE_CLIENT_ID/SECRET, GITHUB_CLIENT_ID/SECRET).
- * 2. `login` → POST al endpoint de sign-in, que responde con cookie httpOnly.
- *    `loginWithProvider` → redirección al flujo OAuth del proveedor.
- * 3. Validar la sesión en el servidor (`beforeLoad` en rutas protegidas) en lugar
- *    del redireccionamiento del lado del cliente de src/components/app-shell.tsx.
- * 4. `updateProfile` y `changePassword` → server functions. Subir el avatar a
- *    un storage (S3, R2…) y guardar solo la URL.
- * La interfaz pública de este archivo (useAuth) no necesita cambiar.
- * ─────────────────────────────────────────────────────────────────────────────
+ * Autenticación con Supabase Auth (email + contraseña, Google y GitHub).
+ * El perfil y las preferencias viven en public.profiles y public.user_preferences
+ * (los crea el trigger handle_new_user al registrarse); RLS limita cada fila a su dueño.
  */
 
 export type AuthProviderId = "email" | "google" | "github";
@@ -50,48 +39,42 @@ export type User = {
 
 type Status = "loading" | "authenticated" | "unauthenticated";
 
+/** Error de auth con código estable para mostrar el mensaje adecuado. */
+export class AuthFailure extends Error {
+  readonly code: string;
+
+  constructor(code: string, message?: string) {
+    super(message ?? code);
+    this.code = code;
+  }
+}
+
+type SignUpResult = { user: User | null; needsConfirmation: boolean };
+
 type AuthContextValue = {
   status: Status;
   user: User | null;
+  /** true tras abrir un enlace de recuperación: permite fijar contraseña sin la actual. */
+  recovering: boolean;
   login: (credentials: { email: string; password: string; remember: boolean }) => Promise<User>;
-  loginWithProvider: (provider: Exclude<AuthProviderId, "email">) => Promise<User>;
-  logout: () => void;
+  signUp: (input: { name: string; email: string; password: string }) => Promise<SignUpResult>;
+  loginWithProvider: (provider: Exclude<AuthProviderId, "email">) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  logout: () => Promise<void>;
+  /** Devuelve true si el cambio de correo quedó pendiente de confirmación. */
   updateProfile: (
     patch: Partial<Pick<User, "name" | "email" | "avatarUrl" | "preferences">>,
-  ) => Promise<void>;
+  ) => Promise<{ emailPending: boolean }>;
   changePassword: (current: string, next: string) => Promise<void>;
 };
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-
-const STORAGE_KEY = "voxguard.session";
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   emailNotifications: true,
   aiAlerts: true,
   autoSave: true,
 };
-
-const MOCK_OAUTH_PROFILES: Record<
-  Exclude<AuthProviderId, "email">,
-  { name: string; email: string }
-> = {
-  google: { name: "Demo User", email: "demo.user@gmail.com" },
-  github: { name: "demo-dev", email: "demo-dev@users.noreply.github.com" },
-};
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * `crypto.randomUUID` solo existe en contextos seguros (HTTPS o localhost).
- * Mientras el sitio se sirva por HTTP plano se usa `getRandomValues`, que sí está disponible.
- */
-function createId() {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
-}
 
 function nameFromEmail(email: string) {
   const local = email.split("@")[0] ?? "";
@@ -103,35 +86,52 @@ function nameFromEmail(email: string) {
   return name || "User";
 }
 
-function readSession(): { user: User; remember: boolean } | null {
-  try {
-    for (const [storage, remember] of [
-      [localStorage, true],
-      [sessionStorage, false],
-    ] as const) {
-      const raw = storage.getItem(STORAGE_KEY);
-      if (raw) {
-        const user = JSON.parse(raw) as User;
-        return {
-          user: { ...user, preferences: { ...DEFAULT_PREFERENCES, ...user.preferences } },
-          remember,
-        };
-      }
-    }
-  } catch {
-    // almacenamiento no disponible o sesión corrupta
-  }
-  return null;
+function asProvider(value: unknown): AuthProviderId {
+  return value === "google" || value === "github" ? value : "email";
 }
 
-function writeSession(user: User | null, remember: boolean) {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    sessionStorage.removeItem(STORAGE_KEY);
-    if (user) (remember ? localStorage : sessionStorage).setItem(STORAGE_KEY, JSON.stringify(user));
-  } catch {
-    // ignorar (p. ej. cuota excedida por un avatar grande)
-  }
+function authFailure(error: { code?: string | undefined; message: string }) {
+  return new AuthFailure(error.code ?? "unknown", error.message);
+}
+
+/** Construye el User de la app a partir de la sesión, el perfil y las preferencias. */
+async function loadUser(authUser: SupabaseUser): Promise<User> {
+  const supabase = getSupabase();
+  const [{ data: profile }, { data: prefs }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle(),
+    supabase.from("user_preferences").select("*").eq("user_id", authUser.id).maybeSingle(),
+  ]);
+  const email = authUser.email ?? profile?.email ?? "";
+  const passwordUpdatedAt = authUser.user_metadata?.["password_updated_at"];
+  return {
+    id: authUser.id,
+    name: profile?.full_name || nameFromEmail(email),
+    email,
+    avatarUrl: profile?.avatar_url ?? null,
+    provider: asProvider(profile?.provider ?? authUser.app_metadata?.["provider"]),
+    createdAt: profile?.created_at ?? authUser.created_at,
+    passwordUpdatedAt: typeof passwordUpdatedAt === "string" ? passwordUpdatedAt : null,
+    preferences: prefs
+      ? {
+          emailNotifications: prefs.email_notifications,
+          aiAlerts: prefs.ai_alerts,
+          autoSave: prefs.auto_save_history,
+        }
+      : DEFAULT_PREFERENCES,
+  };
+}
+
+/** Sube la foto (data URL ya recortada) al bucket avatars y devuelve su URL pública. */
+async function uploadAvatar(userId: string, dataUrl: string) {
+  const supabase = getSupabase();
+  const blob = await (await fetch(dataUrl)).blob();
+  const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+  const path = `${userId}/avatar-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("avatars")
+    .upload(path, blob, { contentType: blob.type, upsert: true });
+  if (error) throw new AuthFailure("avatar_upload", error.message);
+  return supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -139,104 +139,210 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const [user, setUser] = useState<User | null>(null);
-  const [remember, setRemember] = useState(true);
+  const [recovering, setRecovering] = useState(false);
+  const userRef = useRef<User | null>(null);
+  userRef.current = user;
 
-  useEffect(() => {
-    const session = readSession();
-    if (session) {
-      setUser(session.user);
-      setRemember(session.remember);
-      setStatus("authenticated");
-    } else {
+  const applySession = useCallback(async (session: Session | null) => {
+    if (!session) {
+      setUser(null);
       setStatus("unauthenticated");
+      return null;
+    }
+    try {
+      const next = await loadUser(session.user);
+      setUser(next);
+      setStatus("authenticated");
+      return next;
+    } catch (error) {
+      console.error("No se pudo cargar el perfil", error);
+      setUser(null);
+      setStatus("unauthenticated");
+      return null;
     }
   }, []);
 
-  const startSession = useCallback((next: User, keep: boolean) => {
-    setUser(next);
-    setRemember(keep);
-    setStatus("authenticated");
-    writeSession(next, keep);
-    return next;
-  }, []);
+  useEffect(() => {
+    const supabase = getSupabase();
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active) void applySession(data.session);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") setRecovering(true);
+      if (event === "SIGNED_OUT") setRecovering(false);
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+        // Supabase recomienda no llamar a su cliente dentro del callback: se difiere un tick.
+        setTimeout(() => {
+          if (active) void applySession(session);
+        }, 0);
+      }
+    });
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [applySession]);
 
   const login = useCallback<AuthContextValue["login"]>(
-    async ({ email, remember: keep }) => {
-      // TODO(auth): POST /api/auth/sign-in con { email, password }
-      await delay(800);
-      const normalized = email.trim().toLowerCase();
-      return startSession(
-        {
-          id: createId(),
-          name: nameFromEmail(normalized),
-          email: normalized,
-          avatarUrl: null,
-          provider: "email",
-          createdAt: new Date().toISOString(),
-          passwordUpdatedAt: null,
-          preferences: DEFAULT_PREFERENCES,
-        },
-        keep,
-      );
+    async ({ email, password, remember }) => {
+      setRememberSession(remember);
+      const { data, error } = await getSupabase().auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (error) throw authFailure(error);
+      const next = await applySession(data.session);
+      if (!next) throw new AuthFailure("profile_unavailable");
+      return next;
     },
-    [startSession],
+    [applySession],
   );
 
-  const loginWithProvider = useCallback<AuthContextValue["loginWithProvider"]>(
-    async (provider) => {
-      // TODO(auth): redirigir al flujo OAuth de `provider`
-      await delay(1000);
-      return startSession(
-        {
-          id: createId(),
-          ...MOCK_OAUTH_PROFILES[provider],
-          avatarUrl: null,
-          provider,
-          createdAt: new Date().toISOString(),
-          passwordUpdatedAt: null,
-          preferences: DEFAULT_PREFERENCES,
+  const signUp = useCallback<AuthContextValue["signUp"]>(
+    async ({ name, email, password }) => {
+      setRememberSession(true);
+      const { data, error } = await getSupabase().auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: { full_name: name.trim() },
+          emailRedirectTo: `${window.location.origin}/`,
         },
-        true,
-      );
+      });
+      if (error) throw authFailure(error);
+      // Con "Confirm email" activo no hay sesión hasta confirmar; un correo ya registrado
+      // devuelve un usuario sin identidades (Supabase no revela si existe).
+      if (data.user && data.user.identities?.length === 0) {
+        throw new AuthFailure("user_already_exists");
+      }
+      if (!data.session) return { user: null, needsConfirmation: true };
+      return { user: await applySession(data.session), needsConfirmation: false };
     },
-    [startSession],
+    [applySession],
   );
 
-  const logout = useCallback(() => {
-    // TODO(auth): POST /api/auth/sign-out para invalidar la cookie
-    setUser(null);
-    setStatus("unauthenticated");
-    writeSession(null, false);
+  const loginWithProvider = useCallback<AuthContextValue["loginWithProvider"]>(async (provider) => {
+    setRememberSession(true);
+    const { error } = await getSupabase().auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/` },
+    });
+    if (error) throw authFailure(error);
   }, []);
 
-  const updateProfile = useCallback<AuthContextValue["updateProfile"]>(
-    async (patch) => {
-      if (!user) return;
-      const next = { ...user, ...patch };
-      setUser(next);
-      writeSession(next, remember);
-      // TODO(auth): PATCH /api/me con `patch`
-      await delay(400);
+  const requestPasswordReset = useCallback<AuthContextValue["requestPasswordReset"]>(
+    async (email) => {
+      const { error } = await getSupabase().auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/profile`,
+      });
+      if (error) throw authFailure(error);
     },
-    [user, remember],
+    [],
   );
 
+  const logout = useCallback(async () => {
+    await getSupabase().auth.signOut();
+    setUser(null);
+    setStatus("unauthenticated");
+  }, []);
+
+  const updateProfile = useCallback<AuthContextValue["updateProfile"]>(async (patch) => {
+    const current = userRef.current;
+    if (!current) return { emailPending: false };
+    const supabase = getSupabase();
+    const profileUpdate: { full_name?: string; avatar_url?: string | null } = {};
+    const next: User = { ...current };
+
+    if (patch.name !== undefined && patch.name !== current.name) {
+      profileUpdate.full_name = patch.name;
+      next.name = patch.name;
+    }
+    if (patch.avatarUrl !== undefined && patch.avatarUrl !== current.avatarUrl) {
+      const url = patch.avatarUrl ? await uploadAvatar(current.id, patch.avatarUrl) : null;
+      profileUpdate.avatar_url = url;
+      next.avatarUrl = url;
+    }
+    if (Object.keys(profileUpdate).length) {
+      const { error } = await supabase.from("profiles").update(profileUpdate).eq("id", current.id);
+      if (error) throw authFailure(error);
+    }
+
+    if (patch.preferences) {
+      const { error } = await supabase
+        .from("user_preferences")
+        .update({
+          email_notifications: patch.preferences.emailNotifications,
+          ai_alerts: patch.preferences.aiAlerts,
+          auto_save_history: patch.preferences.autoSave,
+        })
+        .eq("user_id", current.id);
+      if (error) throw authFailure(error);
+      next.preferences = patch.preferences;
+    }
+
+    let emailPending = false;
+    if (patch.email !== undefined && patch.email !== current.email) {
+      const { data, error } = await supabase.auth.updateUser({ email: patch.email });
+      if (error) throw authFailure(error);
+      // Con confirmación de cambio de correo, el correo actual sigue vigente hasta confirmar.
+      emailPending = data.user.email !== patch.email;
+      if (!emailPending) next.email = patch.email;
+    }
+
+    setUser(next);
+    return { emailPending };
+  }, []);
+
   const changePassword = useCallback<AuthContextValue["changePassword"]>(
-    async (current, next) => {
-      if (!user) return;
-      // TODO(auth): POST /api/me/password con { current, next }
-      await delay(700);
-      if (current && current === next) throw new Error("same-password");
-      const updated = { ...user, passwordUpdatedAt: new Date().toISOString() };
-      setUser(updated);
-      writeSession(updated, remember);
+    async (currentPassword, nextPassword) => {
+      const current = userRef.current;
+      if (!current) return;
+      const supabase = getSupabase();
+      if (currentPassword) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: current.email,
+          password: currentPassword,
+        });
+        if (error) throw new AuthFailure("wrong_password", error.message);
+      }
+      const passwordUpdatedAt = new Date().toISOString();
+      const { error } = await supabase.auth.updateUser({
+        password: nextPassword,
+        data: { password_updated_at: passwordUpdatedAt },
+      });
+      if (error) throw authFailure(error);
+      setRecovering(false);
+      setUser({ ...current, passwordUpdatedAt });
     },
-    [user, remember],
+    [],
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, login, loginWithProvider, logout, updateProfile, changePassword }),
-    [status, user, login, loginWithProvider, logout, updateProfile, changePassword],
+    () => ({
+      status,
+      user,
+      recovering,
+      login,
+      signUp,
+      loginWithProvider,
+      requestPasswordReset,
+      logout,
+      updateProfile,
+      changePassword,
+    }),
+    [
+      status,
+      user,
+      recovering,
+      login,
+      signUp,
+      loginWithProvider,
+      requestPasswordReset,
+      logout,
+      updateProfile,
+      changePassword,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

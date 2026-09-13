@@ -37,7 +37,8 @@ import { EXAMPLE_PAYLOAD, MAX_WAV_BYTES, type DetectionResult } from "@/lib/dete
 import { DEFAULT_DETECTOR_ID } from "@/lib/detectors.data";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { modelsQueryOptions } from "@/lib/models-query";
-import { addDetection } from "@/lib/tigerdata";
+import { useInvalidateHistory } from "@/lib/history";
+import { authHeaders } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { alturWavIssues, parseWavHeader, type WavInfo, type WavIssue } from "@/lib/wav";
 
@@ -75,6 +76,15 @@ function DetectorPage() {
   const [result, setResult] = useState<DetectionResult | null>(null);
 
   const { data: models } = useQuery(modelsQueryOptions);
+  const invalidateHistory = useInvalidateHistory();
+
+  /** Token de sesión (el servidor guarda la detección a tu nombre) y preferencia de historial. */
+  async function requestHeaders(): Promise<Record<string, string>> {
+    return {
+      ...(await authHeaders()),
+      ...(user?.preferences.autoSave === false ? { "X-Galena-Save": "0" } : {}),
+    };
+  }
 
   useEffect(() => {
     setModel(loadApiSettings().defaultModel);
@@ -101,7 +111,7 @@ function DetectorPage() {
     }
     const detection = body as DetectionResult;
     setResult(detection);
-    if (user?.preferences.autoSave !== false) addDetection(detection);
+    void invalidateHistory();
     toast.success(t("toast.success"));
   }
 
@@ -118,7 +128,7 @@ function DetectorPage() {
     try {
       const res = await fetch(`/api/public/detect?detector=${encodeURIComponent(model)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await requestHeaders()) },
         body: JSON.stringify(parsed),
       });
       await handleResponse(res);
@@ -154,6 +164,7 @@ function DetectorPage() {
     try {
       const res = await fetch(`/api/public/detect/audio?detector=${encodeURIComponent(model)}`, {
         method: "POST",
+        headers: await requestHeaders(),
         body: form,
       });
       await handleResponse(res);
@@ -361,6 +372,18 @@ function DetectorPage() {
                 label={t("field.threshold")}
                 value={result?.threshold !== undefined ? result.threshold.toFixed(2) : undefined}
                 placeholder="0.70"
+                loading={loading}
+              />
+              <Row
+                label={t("field.pSynthetic")}
+                value={
+                  result
+                    ? result.p_synthetic !== undefined
+                      ? result.p_synthetic.toFixed(4)
+                      : "—"
+                    : undefined
+                }
+                placeholder="0.0000"
                 loading={loading}
               />
               <Row

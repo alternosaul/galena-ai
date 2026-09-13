@@ -16,6 +16,7 @@ import { alturWavIssues, describeWavIssue, parseWavHeader } from "./wav";
 
 const upstreamDetectionSchema = z.object({
   is_synthetic: z.boolean(),
+  /** Confianza en el veredicto (versiones anteriores de la API enviaban aquí P(sintético)). */
   confidence: z.number().min(0).max(1),
   /** services/model-api devuelve P(sintético) explícita y el umbral del modelo usado. */
   p_synthetic: z.number().min(0).max(1).optional(),
@@ -61,11 +62,17 @@ type DetectionInput = {
 type Prediction = {
   is_synthetic: boolean;
   confidence: number;
+  p_synthetic: number;
   threshold: number | null;
   detector: string;
   detection_id: string | null;
   simulated: boolean;
 };
+
+/** Confianza en el veredicto a partir de P(sintético), redondeada a 6 decimales. */
+export function verdictConfidence(isSynthetic: boolean, pSynthetic: number) {
+  return Number((isSynthetic ? pSynthetic : 1 - pSynthetic).toFixed(6));
+}
 
 export function modelApiBaseUrl(): string | null {
   const raw = process.env["MODEL_API_URL"]?.trim();
@@ -99,6 +106,7 @@ export async function runDetection(input: DetectionInput): Promise<DetectionResu
     call_id: input.callId,
     is_synthetic: prediction.is_synthetic,
     confidence: prediction.confidence,
+    p_synthetic: prediction.p_synthetic,
     model: prediction.detector,
     threshold: prediction.threshold ?? detector.threshold,
     ...(prediction.detection_id ? { detection_id: prediction.detection_id } : {}),
@@ -150,9 +158,12 @@ async function callModelApi(base: string, input: DetectionInput, detectorId: str
   const parsed = upstreamDetectionSchema.safeParse(body);
   if (!parsed.success) throw new DetectionError("Respuesta inválida de la API de modelos", 502);
 
+  // Se recalcula desde p_synthetic para no depender de qué semántica de `confidence` use la API.
+  const pSynthetic = parsed.data.p_synthetic ?? parsed.data.confidence;
   return {
     is_synthetic: parsed.data.is_synthetic,
-    confidence: parsed.data.p_synthetic ?? parsed.data.confidence,
+    confidence: verdictConfidence(parsed.data.is_synthetic, pSynthetic),
+    p_synthetic: pSynthetic,
     threshold: parsed.data.threshold ?? null,
     detector: res.headers.get("X-Detector") ?? detectorId,
     detection_id: res.headers.get("X-Detection-ID"),
@@ -171,10 +182,12 @@ async function simulatePrediction(
   for (const char of `${detectorId}:${input.callId}`) {
     seed = (seed * 31 + char.charCodeAt(0)) >>> 0;
   }
-  const confidence = Number(((seed % 10_000) / 10_000).toFixed(4));
+  const pSynthetic = Number(((seed % 10_000) / 10_000).toFixed(4));
+  const isSynthetic = pSynthetic >= threshold;
   return {
-    is_synthetic: confidence >= threshold,
-    confidence,
+    is_synthetic: isSynthetic,
+    confidence: verdictConfidence(isSynthetic, pSynthetic),
+    p_synthetic: pSynthetic,
     threshold,
     detector: detectorId,
     detection_id: null,

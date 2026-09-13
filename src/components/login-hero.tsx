@@ -82,10 +82,10 @@ export function LoginHero() {
                   ))}
                 </div>
                 <div className="mt-auto flex items-center gap-3 pt-4">
-                  {/* confidence = P(sintético): una llamada humana tiene un valor bajo. */}
-                  <span className="text-2xl font-semibold">0.103</span>
+                  {/* confidence = confianza en el veredicto (humano, P(sintético) = 0.103). */}
+                  <span className="text-2xl font-semibold">0.897</span>
                   <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/20">
-                    <span className="block h-full w-[10.3%] rounded-full bg-emerald-300" />
+                    <span className="block h-full w-[89.7%] rounded-full bg-emerald-300" />
                   </span>
                 </div>
               </GlassCard>

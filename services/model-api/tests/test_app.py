@@ -52,8 +52,10 @@ def test_detect_each_detector(client, detector):
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert 0.0 <= data["p_synthetic"] <= 1.0
-    assert data["confidence"] == data["p_synthetic"]
     assert data["is_synthetic"] == (data["p_synthetic"] >= data["threshold"])
+    # confidence = confianza en el veredicto, como la lee el juez (check_endpoint.py).
+    expected = data["p_synthetic"] if data["is_synthetic"] else 1.0 - data["p_synthetic"]
+    assert data["confidence"] == pytest.approx(expected, abs=1e-6)
     assert data["detector"] == detector
     assert resp.headers["X-Detector"] == detector
     assert resp.headers["X-Detection-ID"]

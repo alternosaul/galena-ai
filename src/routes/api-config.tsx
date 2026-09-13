@@ -61,9 +61,10 @@ const ENDPOINTS: { method: "GET" | "POST"; path: string; desc: TKey }[] = [
 const EXAMPLE_RESPONSE = `{
   "call_id": "call_5e4539a471f6",
   "is_synthetic": false,
-  "confidence": 0.1034,
-  "model": "baseline",
-  "threshold": 0.7,
+  "confidence": 0.8966,
+  "p_synthetic": 0.1034,
+  "model": "everest",
+  "threshold": 0.5916,
   "detection_id": "2f1c7d0e-5a8b-4f7e-9d1a-3c6b8e2f4a10",
   "latency_ms": 842,
   "received_at": "2026-09-13T18:22:05.114Z",

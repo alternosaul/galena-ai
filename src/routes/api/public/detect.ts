@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { detectRequestSchema, MAX_JSON_BYTES } from "@/lib/detection";
+import { saveDetection } from "@/lib/detections.server";
 import { detectionErrorResponse, jsonResponse, runDetection } from "@/lib/model-api";
 import { base64ToBytes } from "@/lib/wav";
 
@@ -56,6 +57,7 @@ export const Route = createFileRoute("/api/public/detect")({
             inputType: "json",
             source: parsed.data.source ?? "api",
           });
+          await saveDetection(request, { result, inputType: "json", wavBytes });
           return jsonResponse(result);
         } catch (error) {
           return detectionErrorResponse(error);

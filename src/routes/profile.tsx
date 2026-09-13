@@ -23,7 +23,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { DEFAULT_API_SETTINGS, loadApiSettings, saveApiSettings } from "@/lib/api-settings";
-import { EMAIL_RE, useAuth, type User, type UserPreferences } from "@/lib/auth";
+import { AuthFailure, EMAIL_RE, useAuth, type User, type UserPreferences } from "@/lib/auth";
 import { useI18n, type Lang, type TKey } from "@/lib/i18n";
 import { resizeImageToSquare } from "@/lib/image";
 import { modelsQueryOptions } from "@/lib/models-query";
@@ -206,9 +206,18 @@ function PersonalInfoCard({ user }: { user: User }) {
     if (Object.keys(next).length) return;
 
     setSaving(true);
-    await updateProfile({ name: name.trim(), email: email.trim().toLowerCase() });
-    setSaving(false);
-    toast.success(t("profile.saved"));
+    try {
+      const { emailPending } = await updateProfile({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+      });
+      if (emailPending) toast.info(t("profile.emailPending"));
+      else toast.success(t("profile.saved"));
+    } catch {
+      toast.error(t("profile.errSave"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -358,7 +367,9 @@ function PreferencesCard({ user }: { user: User }) {
                 id={`pref-${row.key}`}
                 checked={user.preferences[row.key]}
                 onCheckedChange={(checked) =>
-                  updateProfile({ preferences: { ...user.preferences, [row.key]: checked } })
+                  updateProfile({ preferences: { ...user.preferences, [row.key]: checked } }).catch(
+                    () => toast.error(t("profile.errSave")),
+                  )
                 }
               />
             </label>
@@ -373,15 +384,17 @@ function PreferencesCard({ user }: { user: User }) {
 
 function SecurityCard({ user }: { user: User }) {
   const { t, locale } = useI18n();
-  const { changePassword } = useAuth();
+  const { changePassword, recovering } = useAuth();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errors, setErrors] = useState<FieldErrors<"current" | "next" | "confirm">>({});
   const [saving, setSaving] = useState(false);
 
-  // Una cuenta OAuth que nunca definió contraseña no tiene "contraseña actual".
-  const needsCurrent = user.provider === "email" || user.passwordUpdatedAt !== null;
+  // Una cuenta OAuth que nunca definió contraseña no tiene "contraseña actual", y quien abrió
+  // un enlace de recuperación la está restableciendo.
+  const needsCurrent =
+    !recovering && (user.provider === "email" || user.passwordUpdatedAt !== null);
   const score = passwordScore(next);
   const level =
     score <= 1
@@ -407,8 +420,19 @@ function SecurityCard({ user }: { user: User }) {
       setNext("");
       setConfirm("");
       toast.success(t("profile.passwordChanged"));
-    } catch {
-      toast.error(t("profile.errSame"));
+    } catch (error) {
+      const code = error instanceof AuthFailure ? error.code : "";
+      toast.error(
+        t(
+          code === "wrong_password"
+            ? "profile.errWrongPassword"
+            : code === "same_password"
+              ? "profile.errSame"
+              : code === "weak_password"
+                ? "profile.errWeak"
+                : "profile.errSave",
+        ),
+      );
     } finally {
       setSaving(false);
     }
