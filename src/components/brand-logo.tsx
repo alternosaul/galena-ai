@@ -11,7 +11,7 @@ export function BrandLogo({ className }: { className?: string }) {
     <>
       <img
         src={withBase("/logo-light.svg")}
-        alt="VoxGuard"
+        alt="Galenia"
         width={40}
         height={40}
         draggable={false}
@@ -19,7 +19,7 @@ export function BrandLogo({ className }: { className?: string }) {
       />
       <img
         src={withBase("/logo-dark.svg")}
-        alt="VoxGuard"
+        alt="Galenia"
         width={40}
         height={40}
         draggable={false}

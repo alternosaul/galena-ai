@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/model")({
   head: () => ({
     meta: [
-      { title: "Model — VoxGuard" },
+      { title: "Model — Galenia" },
       { name: "description", content: "Detectores de voz sintética y sus métricas reales." },
     ],
   }),

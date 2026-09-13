@@ -79,14 +79,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "VoxGuard — Detector de llamadas IA vs Humano" },
+      { title: "Galenia — Detector de llamadas IA vs Humano" },
       {
         name: "description",
         content:
           "Analiza llamadas y detecta si fueron hechas por una IA o por una persona, con confianza del modelo y métricas.",
       },
-      { name: "author", content: "VoxGuard" },
-      { property: "og:title", content: "VoxGuard — Detector de llamadas IA vs Humano" },
+      { name: "author", content: "Galenia" },
+      { property: "og:title", content: "Galenia — Detector de llamadas IA vs Humano" },
       {
         property: "og:description",
         content: "Detección de voz sintética con velocímetro de confianza y métricas del modelo.",

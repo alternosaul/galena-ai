@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/history")({
   head: () => ({
     meta: [
-      { title: "History — VoxGuard" },
+      { title: "History — Galenia" },
       { name: "description", content: "Registro de las últimas solicitudes de detección." },
     ],
   }),
@@ -92,7 +92,7 @@ function HistoryPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `voxguard-history-${new Date().toISOString().slice(0, 19)}.json`;
+    a.download = `galenia-history-${new Date().toISOString().slice(0, 19)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }

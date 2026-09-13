@@ -18,6 +18,8 @@ export const Route = createFileRoute("/api/public/detect")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Latencia real: desde que llega la petición (incluye leer el cuerpo) hasta responder.
+        const startedAt = Date.now();
         if (Number(request.headers.get("content-length") ?? "0") > MAX_JSON_BYTES) {
           return jsonResponse({ error: "El JSON debe pesar como máximo 16 MiB" }, 413);
         }
@@ -57,6 +59,7 @@ export const Route = createFileRoute("/api/public/detect")({
             inputType: "json",
             source: parsed.data.source ?? "api",
           });
+          result.latency_ms = Date.now() - startedAt;
           await saveDetection(request, { result, inputType: "json", wavBytes });
           return jsonResponse(result);
         } catch (error) {

@@ -15,6 +15,8 @@ export const Route = createFileRoute("/api/public/detect/audio")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        // Latencia real: desde que llega la petición (incluye la subida del WAV) hasta responder.
+        const startedAt = Date.now();
         let form: FormData;
         try {
           form = await request.formData();
@@ -49,6 +51,7 @@ export const Route = createFileRoute("/api/public/detect/audio")({
             source: "upload",
             fileName: file.name,
           });
+          result.latency_ms = Date.now() - startedAt;
           await saveDetection(request, { result, inputType: "audio_upload", wavBytes });
           return jsonResponse(result);
         } catch (error) {

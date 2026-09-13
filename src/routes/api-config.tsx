@@ -45,7 +45,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/api-config")({
   head: () => ({
     meta: [
-      { title: "API — VoxGuard" },
+      { title: "API — Galenia" },
       { name: "description", content: "Configuración de la conexión a la API de modelos." },
     ],
   }),

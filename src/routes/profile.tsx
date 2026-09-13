@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
-      { title: "Perfil — VoxGuard" },
+      { title: "Perfil — Galenia" },
       { name: "description", content: "Cuenta, preferencias y seguridad." },
     ],
   }),

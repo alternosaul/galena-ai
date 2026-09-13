@@ -42,7 +42,7 @@ export function LoginHero() {
         <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-700">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 py-1 pl-1 pr-3 text-xs font-medium backdrop-blur-md">
             <BrandLogo className="h-5 w-5" />
-            VoxGuard · {t("app.tagline")}
+            Galenia · {t("app.tagline")}
           </span>
           <h2 className="mt-5 text-4xl font-bold leading-tight tracking-tight xl:text-5xl">
             {t("hero.title")}

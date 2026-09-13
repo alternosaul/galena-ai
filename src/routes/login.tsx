@@ -19,8 +19,8 @@ import { useI18n, type TKey } from "@/lib/i18n";
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Iniciar sesión — VoxGuard" },
-      { name: "description", content: "Accede a VoxGuard para analizar llamadas." },
+      { title: "Iniciar sesión — Galenia" },
+      { name: "description", content: "Accede a Galenia para analizar llamadas." },
     ],
   }),
   component: LoginPage,
@@ -127,7 +127,7 @@ function LoginPage() {
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <BrandLogo className="h-10 w-10" />
-            <span className="text-lg font-semibold tracking-tight">VoxGuard</span>
+            <span className="text-lg font-semibold tracking-tight">Galenia</span>
           </div>
           <PreferenceControls />
         </header>

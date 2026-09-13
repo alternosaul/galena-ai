@@ -40,7 +40,7 @@ export function AppSidebar() {
         <div className="flex items-center gap-3 px-1.5 py-3">
           <BrandLogo className="h-10 w-10" />
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-base font-semibold">VoxGuard</p>
+            <p className="truncate text-base font-semibold">Galenia</p>
             <p className="truncate text-xs opacity-70">{t("app.tagline")}</p>
           </div>
         </div>

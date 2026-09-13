@@ -46,13 +46,13 @@ import { alturWavIssues, parseWavHeader, type WavInfo, type WavIssue } from "@/l
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Detector — VoxGuard" },
+      { title: "Detector — Galenia" },
       {
         name: "description",
         content:
           "Envía una llamada y descubre al instante si la voz es de una IA o de una persona.",
       },
-      { property: "og:title", content: "Detector — VoxGuard" },
+      { property: "og:title", content: "Detector — Galenia" },
       {
         property: "og:description",
         content: "Detección de voz sintética con velocímetro de confianza en tiempo real.",
