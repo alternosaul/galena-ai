@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { withBase } from "./base-path";
 import { getSupabase, setRememberSession } from "./supabase";
 
 /**
@@ -207,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         options: {
           data: { full_name: name.trim() },
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}${withBase("/")}`,
         },
       });
       if (error) throw authFailure(error);
@@ -226,7 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRememberSession(true);
     const { error } = await getSupabase().auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/` },
+      options: { redirectTo: `${window.location.origin}${withBase("/")}` },
     });
     if (error) throw authFailure(error);
   }, []);
@@ -234,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const requestPasswordReset = useCallback<AuthContextValue["requestPasswordReset"]>(
     async (email) => {
       const { error } = await getSupabase().auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-        redirectTo: `${window.location.origin}/profile`,
+        redirectTo: `${window.location.origin}${withBase("/profile")}`,
       });
       if (error) throw authFailure(error);
     },

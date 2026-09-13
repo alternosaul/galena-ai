@@ -1,3 +1,4 @@
+import { withBase } from "@/lib/base-path";
 import { cn } from "@/lib/utils";
 
 /**
@@ -9,7 +10,7 @@ export function BrandLogo({ className }: { className?: string }) {
   return (
     <>
       <img
-        src="/logo-light.svg"
+        src={withBase("/logo-light.svg")}
         alt="VoxGuard"
         width={40}
         height={40}
@@ -17,7 +18,7 @@ export function BrandLogo({ className }: { className?: string }) {
         className={cn(base, "dark:hidden")}
       />
       <img
-        src="/logo-dark.svg"
+        src={withBase("/logo-dark.svg")}
         alt="VoxGuard"
         width={40}
         height={40}

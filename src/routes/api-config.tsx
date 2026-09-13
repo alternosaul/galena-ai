@@ -35,6 +35,7 @@ import {
   saveApiSettings,
   type ApiSettings,
 } from "@/lib/api-settings";
+import { BASE_PATH, withBase } from "@/lib/base-path";
 import { EXAMPLE_PAYLOAD } from "@/lib/detection";
 import { useI18n, type TKey } from "@/lib/i18n";
 import type { ModelApiHealth } from "@/lib/model-api";
@@ -91,7 +92,8 @@ function ApiConfigPage() {
 
   useEffect(() => {
     setSettings(loadApiSettings());
-    setOrigin(window.location.origin);
+    // Incluye el prefijo (/dev en la instancia dev) para las URLs copiables y el cURL.
+    setOrigin(`${window.location.origin}${BASE_PATH}`);
   }, []);
 
   function update<K extends keyof ApiSettings>(key: K, value: ApiSettings[K]) {
@@ -113,7 +115,7 @@ function ApiConfigPage() {
     setTest({ status: "testing" });
     const started = performance.now();
     try {
-      const res = await fetch("/api/public/health", {
+      const res = await fetch(withBase("/api/public/health"), {
         signal: AbortSignal.timeout(settings.timeoutSec * 1000),
       });
       const health = (await res.json()) as ModelApiHealth;
@@ -317,7 +319,7 @@ curl -X POST "${origin}/api/public/detect/audio?detector=${settings.defaultModel
                   >
                     {ep.method}
                   </Badge>
-                  <code className="min-w-0 flex-1 truncate text-xs">{ep.path}</code>
+                  <code className="min-w-0 flex-1 truncate text-xs">{withBase(ep.path)}</code>
                   <CopyButton text={`${origin}${ep.path}`} />
                 </div>
                 <p className="mt-1.5 text-xs text-muted-foreground">{t(ep.desc)}</p>

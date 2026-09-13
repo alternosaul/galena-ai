@@ -33,6 +33,7 @@ import { ConfidenceGauge } from "@/components/confidence-gauge";
 import { ResultBadge, VerdictPill } from "@/components/result-badge";
 import { loadApiSettings } from "@/lib/api-settings";
 import { useAuth } from "@/lib/auth";
+import { withBase } from "@/lib/base-path";
 import { EXAMPLE_PAYLOAD, MAX_WAV_BYTES, type DetectionResult } from "@/lib/detection";
 import { DEFAULT_DETECTOR_ID } from "@/lib/detectors.data";
 import { useI18n, type TKey } from "@/lib/i18n";
@@ -126,11 +127,14 @@ function DetectorPage() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch(`/api/public/detect?detector=${encodeURIComponent(model)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(await requestHeaders()) },
-        body: JSON.stringify(parsed),
-      });
+      const res = await fetch(
+        withBase(`/api/public/detect?detector=${encodeURIComponent(model)}`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await requestHeaders()) },
+          body: JSON.stringify(parsed),
+        },
+      );
       await handleResponse(res);
     } catch {
       toast.error(t("toast.networkError"));
@@ -162,11 +166,14 @@ function DetectorPage() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch(`/api/public/detect/audio?detector=${encodeURIComponent(model)}`, {
-        method: "POST",
-        headers: await requestHeaders(),
-        body: form,
-      });
+      const res = await fetch(
+        withBase(`/api/public/detect/audio?detector=${encodeURIComponent(model)}`),
+        {
+          method: "POST",
+          headers: await requestHeaders(),
+          body: form,
+        },
+      );
       await handleResponse(res);
     } catch {
       toast.error(t("toast.networkError"));

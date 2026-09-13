@@ -17,6 +17,8 @@ export default defineConfig(({ command, mode }) => {
   }
 
   return {
+    // Prefijo público: "/" en producción; la instancia dev se compila con APP_BASE_PATH=/dev/.
+    base: process.env["APP_BASE_PATH"] ?? "/",
     plugins: [
       tailwindcss(),
       tsConfigPaths({ projects: ["./tsconfig.json"] }),
