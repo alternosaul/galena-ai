@@ -1,9 +1,8 @@
 import { useEffect } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Waves } from "lucide-react";
-
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
+import { BrandLogo } from "@/components/brand-logo";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -49,9 +48,7 @@ function SplashScreen() {
   const { t } = useI18n();
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
-      <span className="flex h-14 w-14 animate-pulse items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-        <Waves className="h-7 w-7" />
-      </span>
+      <BrandLogo className="h-14 w-14 animate-pulse" />
       <p className="text-sm text-muted-foreground">{t("auth.loading")}</p>
     </div>
   );

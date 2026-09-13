@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
-import { Info, Loader2, Mail, Waves } from "lucide-react";
+import { Info, Loader2, Mail } from "lucide-react";
 
 import { GithubIcon, GoogleIcon } from "@/components/brand-icons";
+import { BrandLogo } from "@/components/brand-logo";
 import { LoginHero } from "@/components/login-hero";
 import { PasswordInput } from "@/components/password-input";
 import { PreferenceControls } from "@/components/app-header";
@@ -76,9 +77,7 @@ function LoginPage() {
       <div className="flex flex-col px-6 py-6 sm:px-12">
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Waves className="h-5 w-5" />
-            </span>
+            <BrandLogo className="h-10 w-10" />
             <span className="text-lg font-semibold tracking-tight">VoxGuard</span>
           </div>
           <PreferenceControls />

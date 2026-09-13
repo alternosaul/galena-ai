@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, History, Plug, Brain, Waves } from "lucide-react";
+import { Activity, History, Plug, Brain } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import {
   Sidebar,
   SidebarContent,
@@ -37,9 +38,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-3 px-1.5 py-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Waves className="h-5 w-5" />
-          </span>
+          <BrandLogo className="h-10 w-10" />
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="truncate text-base font-semibold">VoxGuard</p>
             <p className="truncate text-xs opacity-70">{t("app.tagline")}</p>

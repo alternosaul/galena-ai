@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Check, Waves } from "lucide-react";
+import { Check } from "lucide-react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -38,8 +39,8 @@ export function LoginHero() {
 
       <div className="relative z-10 mx-auto w-full max-w-2xl px-10 py-16 text-white xl:px-14">
         <div className="animate-in fade-in-0 slide-in-from-bottom-4 duration-700">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-medium backdrop-blur-md">
-            <Waves className="h-3.5 w-3.5" />
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 py-1 pl-1 pr-3 text-xs font-medium backdrop-blur-md">
+            <BrandLogo className="h-5 w-5" />
             VoxGuard · {t("app.tagline")}
           </span>
           <h2 className="mt-5 text-4xl font-bold leading-tight tracking-tight xl:text-5xl">
