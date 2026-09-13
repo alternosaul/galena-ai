@@ -82,6 +82,17 @@ const MOCK_OAUTH_PROFILES: Record<
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * `crypto.randomUUID` solo existe en contextos seguros (HTTPS o localhost).
+ * Mientras el sitio se sirva por HTTP plano se usa `getRandomValues`, que sí está disponible.
+ */
+function createId() {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
 function nameFromEmail(email: string) {
   const local = email.split("@")[0] ?? "";
   const name = local
@@ -156,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const normalized = email.trim().toLowerCase();
       return startSession(
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           name: nameFromEmail(normalized),
           email: normalized,
           avatarUrl: null,
@@ -177,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await delay(1000);
       return startSession(
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           ...MOCK_OAUTH_PROFILES[provider],
           avatarUrl: null,
           provider,

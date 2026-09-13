@@ -354,7 +354,9 @@ function CopyButton({ text }: { text: string }) {
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(text);
+      // navigator.clipboard solo existe en contextos seguros (HTTPS o localhost).
+      if (navigator.clipboard) await navigator.clipboard.writeText(text);
+      else copyWithTextarea(text);
       setCopied(true);
       toast.success(t("api.copied"));
       setTimeout(() => setCopied(false), 1500);
@@ -374,6 +376,20 @@ function CopyButton({ text }: { text: string }) {
       {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
     </Button>
   );
+}
+
+/** Respaldo para HTTP plano: copia mediante un textarea temporal. */
+function copyWithTextarea(text: string) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  if (!ok) throw new Error("copy command failed");
 }
 
 function CodeBlock({ code }: { code: string }) {
