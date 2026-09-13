@@ -66,7 +66,7 @@ function DetectorPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const [model, setModel] = useState(DEFAULT_DETECTOR_ID);
-  const [json, setJson] = useState(EXAMPLE_PAYLOAD);
+  const [json, setJson] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileInfo, setFileInfo] = useState<WavInfo | null>(null);
   const [fileIssues, setFileIssues] = useState<WavIssue[]>([]);
@@ -240,6 +240,7 @@ function DetectorPage() {
                 <Textarea
                   value={json}
                   onChange={(e) => setJson(e.target.value)}
+                  placeholder={EXAMPLE_PAYLOAD}
                   rows={12}
                   spellCheck={false}
                   className="font-mono text-xs [overflow-wrap:anywhere]"
@@ -345,7 +346,7 @@ function DetectorPage() {
               <Row
                 label={t("field.callId")}
                 value={result?.call_id}
-                placeholder="call_0a9c546208d1"
+                placeholder="call_5e4539a471f6"
                 loading={loading}
               />
               <Row

@@ -59,7 +59,7 @@ const ENDPOINTS: { method: "GET" | "POST"; path: string; desc: TKey }[] = [
 ];
 
 const EXAMPLE_RESPONSE = `{
-  "call_id": "call_0a9c546208d1",
+  "call_id": "call_5e4539a471f6",
   "is_synthetic": false,
   "confidence": 0.1034,
   "model": "baseline",
@@ -140,7 +140,7 @@ curl -X POST "${origin}/api/public/detect?detector=${settings.defaultModel}" \\
 
 # Archivo WAV (estéreo, 8 kHz, PCM 16 bits)
 curl -X POST "${origin}/api/public/detect/audio?detector=${settings.defaultModel}" \\
-  -F "file=@call_0a9c546208d1.wav"`;
+  -F "file=@call_5e4539a471f6.wav"`;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">

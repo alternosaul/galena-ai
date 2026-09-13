@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { LocalizedText } from "./i18n";
-import { silentWavBase64 } from "./wav";
 
 /**
  * Contratos compartidos entre el frontend, las rutas /api/public/* del sitio y la
@@ -106,10 +105,15 @@ export function evaluationFor(model: ModelInfo, dataset: ModelDataset): ModelEva
   return model.evaluations.find((e) => e.dataset === dataset) ?? null;
 }
 
+/**
+ * Ejemplo de referencia (llamada real call_5e4539a471f6 del reto Altur). El audio (~4 MB en
+ * base64) se recorta a su cabecera WAV: sirve para mostrar el formato, no para enviarse.
+ */
 export const EXAMPLE_PAYLOAD = JSON.stringify(
   {
-    call_id: "call_0a9c546208d1",
-    audio_base64: silentWavBase64(),
+    call_id: "call_5e4539a471f6",
+    audio_base64:
+      "UklGRiT+LgBXQVZFZm10IBAAAAABAAIAQB8AAAB9AAAEABAAZGF0YQD+LgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA…",
     sample_rate: 8000,
     channels: 2,
   },
