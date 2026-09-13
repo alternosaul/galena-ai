@@ -74,6 +74,15 @@ export function verdictConfidence(isSynthetic: boolean, pSynthetic: number) {
   return Number((isSynthetic ? pSynthetic : 1 - pSynthetic).toFixed(6));
 }
 
+/**
+ * Detector por defecto del servidor: GALENA_DEFAULT_DETECTOR si es un id válido (la instancia dev
+ * usa galena-client-only); si no, el del catálogo (everest).
+ */
+export function serverDefaultDetectorId(): string {
+  const configured = process.env["GALENA_DEFAULT_DETECTOR"]?.trim();
+  return configured && findDetector(configured) ? configured : DEFAULT_DETECTOR_ID;
+}
+
 export function modelApiBaseUrl(): string | null {
   const raw = process.env["MODEL_API_URL"]?.trim();
   return raw ? raw.replace(/\/+$/, "") : null;
@@ -86,7 +95,7 @@ function detectionTimeoutMs() {
 
 /** Valida el WAV, llama a la API de modelos (o simula) y arma la respuesta del sitio. */
 export async function runDetection(input: DetectionInput): Promise<DetectionResult> {
-  const detector = findDetector(input.detector ?? DEFAULT_DETECTOR_ID);
+  const detector = findDetector(input.detector ?? serverDefaultDetectorId());
   if (!detector) throw new DetectionError(`Detector desconocido: ${input.detector}`, 400);
 
   const info = parseWavHeader(input.wavBytes);
@@ -203,7 +212,7 @@ export async function getModelApiHealth(): Promise<ModelApiHealth> {
       mode: "simulated",
       ok: true,
       latency_ms: null,
-      default_detector: DEFAULT_DETECTOR_ID,
+      default_detector: serverDefaultDetectorId(),
       available_detectors: DETECTORS.map((d) => d.id),
       thresholds: Object.fromEntries(DETECTORS.map((d) => [d.id, d.threshold])),
       error: null,

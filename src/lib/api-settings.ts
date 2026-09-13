@@ -41,6 +41,15 @@ export function loadApiSettings(): ApiSettings {
   }
 }
 
+/** true si el usuario ya guardó preferencias (entonces se respeta su modelo por defecto). */
+export function hasStoredApiSettings(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export function saveApiSettings(settings: ApiSettings) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));

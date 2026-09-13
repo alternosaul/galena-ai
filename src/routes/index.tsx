@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select";
 import { ConfidenceGauge } from "@/components/confidence-gauge";
 import { ResultBadge, VerdictPill } from "@/components/result-badge";
-import { loadApiSettings } from "@/lib/api-settings";
+import { hasStoredApiSettings, loadApiSettings } from "@/lib/api-settings";
 import { useAuth } from "@/lib/auth";
 import { withBase } from "@/lib/base-path";
 import { EXAMPLE_PAYLOAD, type DetectionResult } from "@/lib/detection";
@@ -90,6 +90,15 @@ function DetectorPage() {
   useEffect(() => {
     setModel(loadApiSettings().defaultModel);
   }, []);
+
+  // Sin preferencia guardada, arranca una sola vez con el detector por defecto del servidor.
+  const serverDefaultApplied = useRef(false);
+  useEffect(() => {
+    const serverDefault = models?.find((m) => m.is_default)?.id;
+    if (!serverDefault || serverDefaultApplied.current) return;
+    serverDefaultApplied.current = true;
+    if (!hasStoredApiSettings()) setModel(serverDefault);
+  }, [models]);
 
   // Si la preferencia guardada apunta a un detector inexistente, usa el predeterminado.
   useEffect(() => {

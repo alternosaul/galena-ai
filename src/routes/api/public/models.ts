@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import type { ModelInfo, ModelsResponse } from "@/lib/detection";
 import { DETECTORS } from "@/lib/detectors.data";
-import { getModelApiHealth } from "@/lib/model-api";
+import { getModelApiHealth, serverDefaultDetectorId } from "@/lib/model-api";
 
 /**
  * GET /api/public/models
@@ -16,8 +16,10 @@ export const Route = createFileRoute("/api/public/models")({
     handlers: {
       GET: async () => {
         const health = await getModelApiHealth();
+        const defaultId = serverDefaultDetectorId();
         const models: ModelInfo[] = DETECTORS.map((detector) => ({
           ...detector,
+          is_default: detector.id === defaultId,
           threshold: health.thresholds[detector.id] ?? detector.threshold,
           available:
             health.mode === "live"
