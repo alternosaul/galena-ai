@@ -1,4 +1,4 @@
-# Galena AI — VoxGuard
+# Galena AI
 
 Web dashboard that analyzes call data and detects whether the voice is **AI-generated or human**, showing the model's verdict, confidence and performance metrics.
 
