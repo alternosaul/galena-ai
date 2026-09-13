@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { MAX_WAV_BYTES } from "@/lib/detection";
 import { saveDetection } from "@/lib/detections.server";
 import { detectionErrorResponse, jsonResponse, runDetection } from "@/lib/model-api";
 import { bytesToBase64 } from "@/lib/wav";
@@ -27,10 +26,6 @@ export const Route = createFileRoute("/api/public/detect/audio")({
         const file = form.get("file");
         if (!(file instanceof File)) {
           return jsonResponse({ error: "Falta el archivo `file`" }, 400);
-        }
-        if (file.size > MAX_WAV_BYTES) {
-          const limitMb = (MAX_WAV_BYTES / 1024 / 1024).toFixed(0);
-          return jsonResponse({ error: `El WAV supera ${limitMb} MB` }, 413);
         }
 
         const rawCallId = form.get("call_id");

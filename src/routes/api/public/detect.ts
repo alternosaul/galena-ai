@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { detectRequestSchema, MAX_JSON_BYTES } from "@/lib/detection";
+import { detectRequestSchema } from "@/lib/detection";
 import { saveDetection } from "@/lib/detections.server";
 import { detectionErrorResponse, jsonResponse, runDetection } from "@/lib/model-api";
 import { base64ToBytes } from "@/lib/wav";
@@ -20,10 +20,6 @@ export const Route = createFileRoute("/api/public/detect")({
       POST: async ({ request }) => {
         // Latencia real: desde que llega la petición (incluye leer el cuerpo) hasta responder.
         const startedAt = Date.now();
-        if (Number(request.headers.get("content-length") ?? "0") > MAX_JSON_BYTES) {
-          return jsonResponse({ error: "El JSON debe pesar como máximo 16 MiB" }, 413);
-        }
-
         let body: unknown;
         try {
           body = await request.json();

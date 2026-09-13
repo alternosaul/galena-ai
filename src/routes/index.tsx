@@ -34,7 +34,7 @@ import { ResultBadge, VerdictPill } from "@/components/result-badge";
 import { loadApiSettings } from "@/lib/api-settings";
 import { useAuth } from "@/lib/auth";
 import { withBase } from "@/lib/base-path";
-import { EXAMPLE_PAYLOAD, MAX_WAV_BYTES, type DetectionResult } from "@/lib/detection";
+import { EXAMPLE_PAYLOAD, type DetectionResult } from "@/lib/detection";
 import { DEFAULT_DETECTOR_ID } from "@/lib/detectors.data";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { modelsQueryOptions } from "@/lib/models-query";
@@ -99,8 +99,7 @@ function DetectorPage() {
   }, [models, model]);
 
   const detectorName = (id: string) => models?.find((m) => m.id === id)?.name ?? id;
-  const fileTooLarge = file ? file.size > MAX_WAV_BYTES : false;
-  const fileInvalid = fileTooLarge || fileIssues.length > 0;
+  const fileInvalid = fileIssues.length > 0;
 
   async function handleResponse(res: Response) {
     const body = (await res.json().catch(() => ({}))) as ErrorBody | DetectionResult;
@@ -297,12 +296,6 @@ function DetectorPage() {
 
                 {file && fileInvalid && (
                   <ul className="space-y-1 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                    {fileTooLarge && (
-                      <li className="flex items-center gap-2">
-                        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                        {t("wav.tooLarge", { value: (MAX_WAV_BYTES / 1024 / 1024).toFixed(0) })}
-                      </li>
-                    )}
                     {fileIssues.map((issue) => (
                       <li key={issue.code} className="flex items-center gap-2">
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

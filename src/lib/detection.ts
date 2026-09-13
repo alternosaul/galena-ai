@@ -6,15 +6,10 @@ import type { LocalizedText } from "./i18n";
  * API de modelos (services/model-api, POST /detect). Ver src/lib/model-api.ts.
  */
 
-/** Límite de la API de modelos para el cuerpo JSON (16 MiB). */
-export const MAX_JSON_BYTES = 16 * 1024 * 1024;
-/** Tamaño máximo de un WAV que cabe en ese JSON una vez convertido a base64. */
-export const MAX_WAV_BYTES = Math.floor(((MAX_JSON_BYTES - 1024) * 3) / 4);
-
 /** Cuerpo de POST /detect (mismo contrato que la API de modelos; `source` es propio del sitio). */
 export const detectRequestSchema = z.object({
   call_id: z.string().trim().min(1, "call_id debe ser texto no vacío"),
-  audio_base64: z.string().min(1).max(MAX_JSON_BYTES),
+  audio_base64: z.string().min(1),
   sample_rate: z.literal(8000),
   channels: z.literal(2),
   source: z.string().max(100).optional(),

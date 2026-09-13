@@ -34,7 +34,7 @@ headers `X-Detection-ID` y `X-Detector`. `p_synthetic` es P(voz sintética) e
 `is_synthetic = p_synthetic >= threshold`. `confidence` es la confianza en ese veredicto
 (`p_synthetic` si es sintética, `1 - p_synthetic` si es humana), que es como la interpreta el juez.
 
-Errores: 400 (JSON, base64, WAV o detector inválido), 413 (> 16 MiB), 415 (no JSON), 503 (sin plazas de inferencia).
+Errores: 400 (JSON, base64, WAV o detector inválido), 415 (no JSON), 503 (sin plazas de inferencia). Sin límite de tamaño del cuerpo.
 
 `GET /health` → `{status, default_detector, available_detectors, thresholds, models}`.
 

@@ -49,7 +49,6 @@ ROOT = Path(__file__).resolve().parent
 MODELS_DIR = Path(os.environ.get("GALENA_MODELS_DIR", ROOT / "final_models"))
 DEFAULT_DETECTOR = os.environ.get("GALENA_DEFAULT_DETECTOR", "everest")
 INFERENCE_SLOTS = int(os.environ.get("GALENA_INFERENCE_SLOTS", "2"))
-MAX_JSON_BYTES = 16 * 1024 * 1024
 MAX_SECONDS = 300
 
 
@@ -126,7 +125,7 @@ class DetectRequest(BaseModel):
     model_config = ConfigDict(strict=True)
 
     call_id: str = Field(min_length=1)
-    audio_base64: str = Field(min_length=1, max_length=MAX_JSON_BYTES)
+    audio_base64: str = Field(min_length=1)
     sample_rate: int = Field(ge=SAMPLE_RATE, le=SAMPLE_RATE)
     channels: int = Field(ge=1, le=2)
 
@@ -165,17 +164,11 @@ app = FastAPI(title="Galena model API", version="2.0.0", lifespan=lifespan)
 
 @app.middleware("http")
 async def limit_detect_body(request: Request, call_next):
-    """Rechaza POST /detect sin JSON o con cuerpo declarado mayor a 16 MiB antes de leerlo."""
+    """Rechaza POST /detect sin JSON antes de leer el cuerpo (sin límite de tamaño)."""
     if request.method == "POST" and request.url.path == "/detect":
         media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
         if media_type != "application/json":
             return JSONResponse({"error": "Content-Type debe ser application/json"}, status_code=415)
-        try:
-            length = int(request.headers.get("content-length", "0"))
-        except ValueError:
-            return JSONResponse({"error": "Content-Length inválido"}, status_code=400)
-        if not 0 < length <= MAX_JSON_BYTES:
-            return JSONResponse({"error": "El JSON debe contener entre 1 byte y 16 MiB"}, status_code=413)
     return await call_next(request)
 
 
