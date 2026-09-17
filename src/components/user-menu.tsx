@@ -36,9 +36,14 @@ export function UserMenu() {
   // Demo sin sesión: sin este botón el panel de login quedaría sin acceso desde la interfaz.
   if (!user)
     return (
-      <Button asChild variant="outline" size="sm">
+      <Button
+        asChild
+        variant="outline"
+        size="sm"
+        className="flat:h-9 flat:px-3 flat:text-xs flat:tracking-[0.1em] md:flat:h-12 md:flat:px-6 md:flat:text-sm md:flat:tracking-[0.18em] editorial:border-primary editorial:bg-primary editorial:text-primary-foreground editorial:hover:bg-primary/85 editorial:hover:text-primary-foreground terminal:border-primary terminal:text-primary terminal:hover:bg-primary terminal:hover:text-primary-foreground nocturne:border-primary nocturne:text-ai nocturne:hover:bg-primary nocturne:hover:text-primary-foreground"
+      >
         <Link to="/login">
-          <LogIn className="mr-2 h-4 w-4" />
+          <LogIn className="mr-2 h-4 w-4 flat:hidden" />
           {t("login.submit")}
         </Link>
       </Button>

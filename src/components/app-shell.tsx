@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type CSSProperties } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -32,12 +32,13 @@ export function AppShell() {
   if (status === "loading") return <SplashScreen />;
 
   return (
-    <SidebarProvider>
+    // El ancho del menú lateral depende del tema (--app-sidebar-width en src/styles.css).
+    <SidebarProvider style={{ "--sidebar-width": "var(--app-sidebar-width)" } as CSSProperties}>
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
-          <main className="flex-1 p-4 md:p-6">
+          <main className="min-w-0 flex-1 p-4 md:p-6 md:flat:p-10">
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
           </main>

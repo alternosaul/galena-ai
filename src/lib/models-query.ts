@@ -11,3 +11,20 @@ export const modelsQueryOptions = queryOptions({
     return body.models;
   },
 });
+
+export type ServerHealth = {
+  mode: "live" | "simulated";
+  ok: boolean;
+  latency_ms: number | null;
+  default_detector: string | null;
+};
+
+/** Estado del servidor de modelos para el pie del menú lateral; se refresca cada minuto. */
+export const healthQueryOptions = queryOptions({
+  queryKey: ["health"],
+  queryFn: async (): Promise<ServerHealth> => {
+    const res = await fetch(withBase("/api/public/health"));
+    return (await res.json()) as ServerHealth;
+  },
+  refetchInterval: 60_000,
+});

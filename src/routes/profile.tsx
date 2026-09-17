@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Camera, Check, KeyRound, Loader2, LogOut, Moon, Sun, Trash2, X } from "lucide-react";
+import { Camera, Check, KeyRound, Loader2, LogOut, Trash2, X } from "lucide-react";
 
 import { GithubIcon, GoogleIcon } from "@/components/brand-icons";
 import { PasswordInput } from "@/components/password-input";
@@ -28,7 +28,7 @@ import { useI18n, type Lang, type TKey } from "@/lib/i18n";
 import { resizeImageToSquare } from "@/lib/image";
 import { modelsQueryOptions } from "@/lib/models-query";
 import { PASSWORD_RULES, passwordScore } from "@/lib/password";
-import { useTheme } from "@/lib/theme";
+import { THEMES, useTheme, type ThemeId } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/profile")({
@@ -60,7 +60,9 @@ function ProfilePage() {
   if (!user)
     return (
       <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">{t("profile.title")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight flat:t-display flat:text-5xl md:flat:text-6xl editorial:font-extrabold">
+          {t("profile.title")}
+        </h1>
         <p className="text-sm text-muted-foreground">{t("login.subtitle")}</p>
         <Button asChild>
           <Link to="/login">{t("login.submit")}</Link>
@@ -71,7 +73,9 @@ function ProfilePage() {
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("profile.title")}</h1>
+        <h1 className="text-2xl font-bold tracking-tight flat:t-display flat:text-5xl md:flat:text-6xl editorial:font-extrabold">
+          {t("profile.title")}
+        </h1>
         <p className="text-sm text-muted-foreground">{t("profile.subtitle")}</p>
       </div>
 
@@ -283,7 +287,7 @@ const PREFERENCE_ROWS: { key: keyof UserPreferences; label: TKey; desc: TKey }[]
 
 function PreferencesCard({ user }: { user: User }) {
   const { t, lang, setLang } = useI18n();
-  const { theme, setTheme } = useTheme();
+  const { themeId, setThemeId } = useTheme();
   const { updateProfile } = useAuth();
   const { data: models = [] } = useQuery(modelsQueryOptions);
   const [defaultModel, setDefaultModel] = useState(DEFAULT_API_SETTINGS.defaultModel);
@@ -324,22 +328,18 @@ function PreferencesCard({ user }: { user: User }) {
           </div>
           <div className="space-y-1.5">
             <Label>{t("profile.theme")}</Label>
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              value={theme}
-              onValueChange={(v) => v && setTheme(v as "light" | "dark")}
-              className="w-full"
-            >
-              <ToggleGroupItem value="light" className="flex-1 gap-1.5">
-                <Sun className="h-4 w-4" />
-                {t("theme.lightShort")}
-              </ToggleGroupItem>
-              <ToggleGroupItem value="dark" className="flex-1 gap-1.5">
-                <Moon className="h-4 w-4" />
-                {t("theme.darkShort")}
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <Select value={themeId} onValueChange={(v) => setThemeId(v as ThemeId)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {THEMES.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    {t(option.label)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
