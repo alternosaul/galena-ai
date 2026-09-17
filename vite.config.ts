@@ -26,8 +26,12 @@ export default defineConfig(({ command, mode }) => {
         // Use src/server.ts (our SSR error wrapper) as the server entry.
         server: { entry: "server" },
       }),
-      // Build a standalone Node server (.output/server/index.mjs) for the VPS behind nginx.
-      ...(command === "build" ? [nitro({ preset: "node-server" })] : []),
+      // Por defecto compila un servidor Node autónomo (.output/server/index.mjs) para la VPS
+      // detrás de nginx. NITRO_PRESET=vercel o cloudflare_module compila para esas plataformas,
+      // que ejecutan las rutas /api/public/* como funciones en su capa gratuita.
+      ...(command === "build"
+        ? [nitro({ preset: process.env["NITRO_PRESET"] ?? "node-server" })]
+        : []),
       viteReact(),
     ],
     resolve: {

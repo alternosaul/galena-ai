@@ -38,6 +38,36 @@ Errores: 400 (JSON, base64, WAV o detector inválido), 415 (no JSON), 503 (sin p
 
 `GET /health` → `{status, default_detector, available_detectors, thresholds, models}`.
 
+## Despliegue
+
+`Dockerfile` construye la imagen de servicio. El contenedor escucha en `$PORT` (7860 por defecto):
+
+```bash
+docker build -t galena-model-api .
+docker run --rm -p 8000:8000 -e PORT=8000 galena-model-api
+```
+
+Pensado para **Hugging Face Spaces** (capa gratuita, SDK Docker), que expone el 7860. El Space
+necesita este frontmatter al inicio del README de *su* repo:
+
+```yaml
+---
+title: Galena Model API
+sdk: docker
+app_port: 7860
+---
+```
+
+Notas de operación:
+
+- El `lifespan` carga los 6 detectores y calienta librosa/numba antes de aceptar tráfico, así que
+  el arranque en frío tarda decenas de segundos. En un Space gratuito que se duerme por inactividad,
+  la primera petición después de despertar paga ese costo.
+- Cargar los 6 detectores no cabe con holgura en plataformas de 512 MB de RAM (Render free).
+  Para ajustarse, reduce `DETECTORS` en `app.py` o sube el plan.
+- No lleva CORS a propósito: solo la habla el servidor del sitio vía `MODEL_API_URL`, nunca el
+  navegador. Si algún día se expone al navegador, hay que añadir `CORSMiddleware`.
+
 ## Desarrollo
 
 ```bash
