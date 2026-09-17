@@ -425,19 +425,19 @@ function DetectorPage() {
             {t("detector.subtitle")}
           </p>
         </div>
-        <div className="w-full sm:w-64 flat:w-auto md:flat:text-right terminal:border terminal:border-rule terminal:px-6 terminal:py-4 md:terminal:text-left">
+        <div className="w-full sm:w-64 flat:w-auto md:flat:text-right terminal:border terminal:border-rule terminal:px-6 terminal:py-4 terminal:transition-colors terminal:hover:border-cta md:terminal:text-left">
           <Label className="mb-1.5 block text-xs uppercase tracking-wide text-muted-foreground flat:mb-3 flat:t-label flat:text-sm">
             {t("detector.model")}
           </Label>
           <Select value={model} onValueChange={setModel}>
-            <SelectTrigger className="flat:h-auto flat:w-auto flat:gap-3 flat:border-0 flat:bg-transparent flat:p-0 flat:t-display flat:text-3xl flat:shadow-none flat:focus:ring-0 md:flat:ml-auto md:flat:text-4xl md:nocturne:text-5xl flat:[&>svg]:hidden md:terminal:ml-0">
+            <SelectTrigger className="flat:h-auto flat:w-auto flat:gap-3 flat:border-0 flat:bg-transparent flat:p-0 flat:t-display flat:text-3xl flat:text-cta flat:shadow-none flat:transition-all flat:duration-200 flat:hover:opacity-80 flat:focus:ring-0 flat:focus-visible:ring-2 flat:focus-visible:ring-cta flat:focus-visible:ring-offset-4 flat:focus-visible:ring-offset-background motion-safe:flat:hover:-translate-y-0.5 md:flat:ml-auto md:flat:text-4xl md:nocturne:text-5xl flat:[&>svg]:hidden md:terminal:ml-0">
               <SelectValue placeholder={t("detector.modelPlaceholder")}>
                 {selectedModel ? (
                   <span className="flex items-center gap-2 flat:gap-[0.3em]">
                     <Mountain className="h-3.5 w-3.5 text-primary flat:hidden" />
                     {selectedModel.name}
                     {selectedModel.rank !== null && (
-                      <span className="font-mono text-xs text-muted-foreground flat:font-[inherit] flat:text-[length:inherit] flat:text-foreground">
+                      <span className="font-mono text-xs text-muted-foreground flat:font-[inherit] flat:text-[length:inherit] flat:text-current">
                         #{selectedModel.rank}
                       </span>
                     )}
@@ -490,8 +490,12 @@ function DetectorPage() {
               </TabsList>
 
               <TabsContent value="audio" className="space-y-3 flat:space-y-7">
-                <div className="space-y-2 rounded-md border border-dashed border-border p-3 transition-colors hover:border-primary/50 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-500 flat:space-y-4 flat:border-solid flat:border-rule flat:px-6 flat:py-5 flat:hover:border-foreground terminal:hover:border-primary">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flat:t-label flat:text-sm">
+                <div className="space-y-2 rounded-md border border-dashed border-border p-3 transition-colors hover:border-primary/50 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-500 flat:space-y-4 flat:border-solid flat:border-rule flat:px-6 flat:py-5 flat:hover:border-cta">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flat:flex flat:items-center flat:gap-2.5 flat:t-label flat:text-sm">
+                    <span
+                      aria-hidden
+                      className="hidden size-2 rounded-full bg-cta flat:inline-block motion-safe:animate-pulse"
+                    />
                     {t("detector.previewAudio")}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 flat:gap-4 sm:flat:flex-nowrap sm:flat:gap-5">
@@ -511,7 +515,7 @@ function DetectorPage() {
                       size="sm"
                       onClick={() => void loadPreviewAudio()}
                       disabled={loadingPreview || normalizing}
-                      className="flat:h-11 flat:shrink-0 flat:border flat:border-rule flat:bg-transparent flat:px-5 flat:text-sm flat:shadow-none flat:hover:bg-foreground flat:hover:text-background terminal:font-mono terminal:hover:border-primary terminal:hover:bg-primary terminal:hover:text-primary-foreground nocturne:hover:border-primary nocturne:hover:bg-primary nocturne:hover:text-primary-foreground"
+                      className="flat:h-11 flat:shrink-0 flat:border flat:border-cta flat:bg-transparent flat:px-5 flat:text-sm flat:text-cta flat:shadow-none flat:hover:bg-cta flat:hover:text-cta-foreground terminal:font-mono"
                     >
                       {loadingPreview ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -529,6 +533,7 @@ function DetectorPage() {
                 </div>
 
                 <label
+                  data-state={dragging ? "dragging" : file && !fileInvalid ? "ready" : "idle"}
                   onDragOver={(e) => {
                     e.preventDefault();
                     setDragging(true);
@@ -536,22 +541,34 @@ function DetectorPage() {
                   onDragLeave={() => setDragging(false)}
                   onDrop={onDrop}
                   className={cn(
-                    "group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-secondary/40 px-6 py-12 text-center transition-all duration-300 hover:border-primary hover:bg-primary/5 hover:shadow-md motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500",
-                    "flat:gap-5 flat:border-[1.5px] flat:border-rule flat:bg-transparent flat:px-8 flat:py-20 flat:hover:bg-accent/40 flat:hover:shadow-none editorial:hover:border-foreground terminal:border-muted-foreground/45 terminal:hover:border-primary nocturne:border-muted-foreground/40 nocturne:hover:border-primary",
-                    dragging && "border-primary bg-primary/10 motion-safe:scale-[1.02]",
+                    "dropzone-warp group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-secondary/40 px-6 py-12 text-center transition-all duration-300 hover:border-primary hover:bg-primary/5 hover:shadow-md motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500",
+                    "flat:gap-5 flat:border-[1.5px] flat:border-rule/50 flat:bg-transparent flat:px-8 flat:py-16 flat:hover:border-transparent flat:hover:bg-cta/5 flat:hover:shadow-none",
+                    dragging &&
+                      "border-primary bg-primary/10 motion-safe:scale-[1.02] flat:bg-cta/10",
                   )}
                 >
                   <Upload
                     className={cn(
-                      "h-6 w-6 text-primary transition-transform duration-300 motion-safe:group-hover:-translate-y-1 motion-safe:group-hover:scale-110 flat:hidden",
+                      "h-6 w-6 text-primary transition-transform duration-300 motion-safe:group-hover:-translate-y-1 motion-safe:group-hover:scale-110 flat:h-9 flat:w-9 flat:text-cta",
                       dragging && "motion-safe:animate-bounce",
                     )}
                   />
-                  <span className="text-sm font-medium flat:t-display flat:text-2xl flat:leading-tight md:flat:text-[1.75rem] editorial:font-bold editorial:tracking-[-0.02em] terminal:font-semibold md:nocturne:text-[2.5rem] motion-safe:flat:transition-transform motion-safe:flat:duration-300 motion-safe:flat:group-hover:-translate-y-1">
+                  <span
+                    className={cn(
+                      "text-sm font-medium flat:t-display flat:text-2xl flat:leading-tight flat:transition-all flat:duration-300 flat:group-hover:text-cta motion-safe:flat:group-hover:-translate-y-1 md:flat:text-[1.75rem] editorial:font-bold editorial:tracking-[-0.02em] terminal:font-semibold md:nocturne:text-[2.5rem]",
+                      file && !fileInvalid && "flat:text-cta",
+                    )}
+                  >
                     {file ? file.name : t("detector.dropFile")}
                   </span>
                   <span className="text-xs text-muted-foreground flat:t-label flat:max-w-lg flat:text-sm flat:leading-7 editorial:tracking-[0.1em] terminal:normal-case terminal:tracking-wide nocturne:normal-case nocturne:tracking-wide">
                     {t("detector.fileHint")}
+                  </span>
+                  <span
+                    aria-hidden
+                    className="hidden items-center gap-2 border border-cta px-5 py-2.5 t-label text-sm text-cta transition-colors duration-200 group-hover:bg-cta group-hover:text-cta-foreground flat:inline-flex terminal:font-mono"
+                  >
+                    {file ? t("detector.browseAgain") : t("detector.browse")}
                   </span>
                   <input
                     type="file"
@@ -561,15 +578,13 @@ function DetectorPage() {
                   />
                 </label>
 
-                <ul className="space-y-1.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground flat:space-y-1 flat:border-0 flat:bg-transparent flat:px-0 flat:py-0 flat:text-base flat:leading-8 md:flat:text-lg md:flat:leading-9 editorial:text-foreground/80 terminal:font-mono terminal:text-base md:terminal:text-base nocturne:border-l-2 nocturne:border-primary nocturne:pl-6 nocturne:text-foreground/85">
-                  <li className="flex items-center gap-2 flat:block">
-                    <FileAudio className="h-3.5 w-3.5 shrink-0 text-primary flat:hidden" />
-                    <span className="hidden terminal:inline">– </span>
+                <ul className="space-y-1.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground flat:space-y-2 flat:border-0 flat:border-l-2 flat:border-cta flat:bg-cta/5 flat:px-5 flat:py-4 flat:text-base flat:leading-7 editorial:text-foreground/85 terminal:font-mono nocturne:text-foreground/85">
+                  <li className="flex items-center gap-2 flat:items-start flat:gap-3">
+                    <FileAudio className="h-3.5 w-3.5 shrink-0 text-primary flat:mt-1.5 flat:h-4 flat:w-4 flat:text-cta" />
                     {t("detector.noteWav")}
                   </li>
-                  <li className="flex items-center gap-2 flat:block">
-                    <Clock className="h-3.5 w-3.5 shrink-0 text-primary flat:hidden" />
-                    <span className="hidden terminal:inline">– </span>
+                  <li className="flex items-center gap-2 flat:items-start flat:gap-3">
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-primary flat:mt-1.5 flat:h-4 flat:w-4 flat:text-cta" />
                     {t("detector.noteColdStart")}
                   </li>
                 </ul>
@@ -613,7 +628,12 @@ function DetectorPage() {
                   <Button
                     onClick={analyzeAudio}
                     disabled={loading || normalizing || !file || fileInvalid}
-                    className={cn("w-full sm:w-auto", ACTION_BUTTON)}
+                    className={cn(
+                      "w-full sm:w-auto",
+                      ACTION_BUTTON,
+                      PRIMARY_ACTION,
+                      file && !fileInvalid && !loading && "cta-ready",
+                    )}
                   >
                     <Play className="mr-2 h-4 w-4 flat:hidden" />
                     {t("detector.analyzeAudio")}
@@ -632,6 +652,11 @@ function DetectorPage() {
                     {t("detector.toBase64")}
                   </Button>
                 </div>
+                {(!file || fileInvalid) && !normalizing && (
+                  <p className="hidden t-label text-xs normal-case tracking-normal text-muted-foreground flat:block">
+                    {t("detector.analyzeHint")}
+                  </p>
+                )}
               </TabsContent>
 
               <TabsContent value="base64" className="space-y-4 flat:space-y-7">
@@ -736,7 +761,12 @@ function DetectorPage() {
                   <Button
                     onClick={analyzeBase64}
                     disabled={loading}
-                    className={cn("w-full sm:w-auto", ACTION_BUTTON)}
+                    className={cn(
+                      "w-full sm:w-auto",
+                      ACTION_BUTTON,
+                      PRIMARY_ACTION,
+                      cleanBase64 && !loading && "cta-ready",
+                    )}
                   >
                     <Play className="mr-2 h-4 w-4 flat:hidden" />
                     {t("detector.analyzeCall")}
@@ -1020,6 +1050,12 @@ const PANEL_DESCRIPTION =
 const PANEL_CONTENT = "flat:px-6 flat:pb-12 md:flat:px-10";
 const PANEL_BADGE =
   "flat:rounded-none flat:border-rule flat:px-4 flat:py-2 flat:t-label flat:text-sm flat:text-foreground terminal:text-muted-foreground";
+/**
+ * Acción principal de cada pestaña (Analizar): color de CTA del tema. Deshabilitada se ve como un
+ * contorno punteado, no como un botón roto, y un texto debajo explica cómo activarla.
+ */
+const PRIMARY_ACTION =
+  "flat:border flat:border-cta flat:bg-cta flat:text-cta-foreground flat:shadow-[0_12px_32px_-14px_var(--cta)] flat:hover:bg-cta/90 flat:hover:shadow-[0_16px_36px_-12px_var(--cta)] flat:disabled:border-dashed flat:disabled:border-rule flat:disabled:bg-transparent flat:disabled:text-muted-foreground flat:disabled:opacity-100 flat:disabled:shadow-none";
 const ACTION_BUTTON =
   "flat:h-auto flat:min-h-16 flat:whitespace-normal flat:px-6 flat:py-4 flat:text-base terminal:text-xl";
 

@@ -80,6 +80,9 @@
   --color-human: var(--human);
   --color-tab-active: var(--tab-active);
   --color-tab-active-foreground: var(--tab-active-foreground);
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
+  --color-warp: var(--warp);
 }
 
 /*
@@ -159,6 +162,11 @@
   --human: var(--success);
   --tab-active: var(--background);
   --tab-active-foreground: var(--foreground);
+  /* Color de llamada a la acción y de la luz que recorre la caja de audio (temas flat) */
+  --cta: var(--primary);
+  --cta-foreground: var(--primary-foreground);
+  --warp: var(--primary);
+  --warp-2: var(--primary);
 }
 
 .dark {
@@ -249,6 +257,10 @@
   --human: oklch(0.2 0.006 270);
   --tab-active: oklch(0.2 0.006 270);
   --tab-active-foreground: oklch(0.957 0.005 95);
+  --cta: oklch(0.58 0.21 32);
+  --cta-foreground: oklch(0.985 0.004 95);
+  --warp: oklch(0.62 0.22 32);
+  --warp-2: oklch(0.8 0.16 70);
   --sidebar: oklch(0.957 0.005 95);
   --sidebar-foreground: oklch(0.2 0.006 270);
   --sidebar-primary: oklch(0.2 0.006 270);
@@ -304,6 +316,10 @@
   --human: oklch(0.73 0.14 118);
   --tab-active: oklch(0.73 0.14 118);
   --tab-active-foreground: oklch(0.18 0.008 120);
+  --cta: oklch(0.88 0.2 124);
+  --cta-foreground: oklch(0.16 0.01 120);
+  --warp: oklch(0.9 0.21 124);
+  --warp-2: oklch(0.86 0.14 190);
   --sidebar: oklch(0.18 0.008 120);
   --sidebar-foreground: oklch(0.9 0.015 100);
   --sidebar-primary: oklch(0.73 0.14 118);
@@ -358,6 +374,10 @@
   --human: oklch(0.72 0.07 140);
   --tab-active: oklch(0.93 0.017 80);
   --tab-active-foreground: oklch(0.19 0.008 80);
+  --cta: oklch(0.62 0.19 38);
+  --cta-foreground: oklch(0.97 0.012 80);
+  --warp: oklch(0.72 0.18 42);
+  --warp-2: oklch(0.85 0.13 82);
   --sidebar: oklch(0.19 0.008 80);
   --sidebar-foreground: oklch(0.93 0.017 80);
   --sidebar-primary: oklch(0.69 0.12 40);
@@ -390,6 +410,130 @@
   font-weight: 400;
   letter-spacing: 0.2em;
   text-transform: uppercase;
+}
+
+/*
+ * Caja de audio en los temas flat: una luz recorre el borde (conic-gradient enmascarado al contorno)
+ * y un halo difuso la acompaña. data-state: idle (recorrido lento), dragging (rápido e intenso),
+ * ready (archivo listo: borde completo y fijo).
+ */
+@property --warp-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes warp-spin {
+  to {
+    --warp-angle: 360deg;
+  }
+}
+
+@keyframes cta-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--cta) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px color-mix(in oklab, var(--cta) 0%, transparent);
+  }
+}
+
+[data-layout="flat"] .dropzone-warp {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-layout="flat"] .dropzone-warp::before,
+[data-layout="flat"] .dropzone-warp::after {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--warp-angle),
+    transparent 0deg 210deg,
+    color-mix(in oklab, var(--warp-2) 70%, transparent) 265deg,
+    var(--warp) 330deg,
+    transparent 360deg
+  );
+  animation: warp-spin 4.5s linear infinite;
+  transition: opacity 300ms ease;
+}
+
+/* Contorno de 2px con la luz */
+[data-layout="flat"] .dropzone-warp::before {
+  padding: 2.5px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+
+/* Halo difuso detrás del contorno */
+[data-layout="flat"] .dropzone-warp::after {
+  z-index: -1;
+  filter: blur(14px);
+  opacity: 0.35;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  padding: 10px;
+  inset: -9px;
+}
+
+[data-layout="flat"] .dropzone-warp:hover::before,
+[data-layout="flat"] .dropzone-warp:focus-within::before {
+  animation-duration: 2.6s;
+}
+
+[data-layout="flat"] .dropzone-warp:hover::after {
+  opacity: 0.6;
+  animation-duration: 2.6s;
+}
+
+[data-layout="flat"] .dropzone-warp[data-state="dragging"]::before,
+[data-layout="flat"] .dropzone-warp[data-state="dragging"]::after {
+  animation-duration: 1.1s;
+}
+
+[data-layout="flat"] .dropzone-warp[data-state="dragging"]::after {
+  opacity: 0.85;
+}
+
+[data-layout="flat"] .dropzone-warp[data-state="ready"]::before {
+  animation: none;
+  background: var(--warp);
+}
+
+[data-layout="flat"] .dropzone-warp[data-state="ready"]::after {
+  animation: none;
+  background: var(--warp);
+  opacity: 0.25;
+}
+
+/* Botón principal listo para usar: pulso suave hacia afuera */
+[data-layout="flat"] .cta-ready:not(:disabled) {
+  animation: cta-glow 2.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-layout="flat"] .dropzone-warp::before,
+  [data-layout="flat"] .dropzone-warp::after {
+    animation: none;
+    background: color-mix(in oklab, var(--warp) 60%, transparent);
+  }
+
+  [data-layout="flat"] .cta-ready:not(:disabled) {
+    animation: none;
+  }
 }
 
 @layer base {

@@ -59,10 +59,8 @@ export function ExamplePlayer({
         onClick={toggle}
         aria-label={playing ? t("player.pause") : t("player.play")}
         className={cn(
-          "grid size-11 shrink-0 cursor-pointer place-items-center border border-rule text-foreground transition-all duration-200",
-          "hover:bg-foreground hover:text-background motion-safe:active:scale-95",
-          "terminal:border-primary terminal:text-primary terminal:hover:bg-primary terminal:hover:text-primary-foreground",
-          "nocturne:rounded-full nocturne:border-primary nocturne:text-primary nocturne:hover:bg-primary nocturne:hover:text-primary-foreground",
+          "grid size-11 shrink-0 cursor-pointer place-items-center border border-cta bg-cta text-cta-foreground shadow-[0_8px_20px_-10px_var(--cta)] transition-all duration-200",
+          "hover:brightness-110 motion-safe:hover:scale-105 motion-safe:active:scale-95 nocturne:rounded-full",
         )}
       >
         {playing ? (
@@ -87,8 +85,8 @@ export function ExamplePlayer({
               // En pantallas angostas basta la mitad de las barras.
               index % 2 === 1 && "max-sm:hidden",
               index / BARS.length < progress
-                ? "bg-foreground terminal:bg-primary nocturne:bg-primary"
-                : "bg-foreground/80 group-hover:bg-foreground terminal:bg-primary/55 nocturne:bg-muted-foreground/45",
+                ? "bg-cta"
+                : "bg-foreground/60 group-hover:bg-foreground/85 terminal:bg-primary/55 nocturne:bg-muted-foreground/45",
               playing && "motion-safe:animate-pulse",
             )}
           />
