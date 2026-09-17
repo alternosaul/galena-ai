@@ -74,22 +74,29 @@ export function ExamplePlayer({
         type="button"
         onClick={seek}
         aria-label={t("player.seek")}
-        className="group flex h-10 min-w-0 flex-1 cursor-pointer items-center justify-between gap-[3px]"
+        className="group flex h-10 min-w-0 flex-1 cursor-pointer items-center overflow-hidden"
       >
+        {/* Cada barra ocupa una celda flexible (sin gap fijo): se reparten el ancho disponible y
+            nunca invaden el tiempo ni el botón. En cajas angostas se muestra la mitad. */}
         {BARS.map((height, index) => (
           <span
             key={index}
-            style={{ height: `${Math.round(height * 100)}%` }}
             className={cn(
-              "w-[2px] shrink-0 transition-colors duration-300",
-              // En pantallas angostas basta la mitad de las barras.
-              index % 2 === 1 && "max-sm:hidden",
-              index / BARS.length < progress
-                ? "bg-cta"
-                : "bg-foreground/60 group-hover:bg-foreground/85 terminal:bg-primary/55 nocturne:bg-muted-foreground/45",
-              playing && "motion-safe:animate-pulse",
+              "flex h-full min-w-[3px] flex-1 items-center justify-center",
+              index % 2 === 1 && "@max-md:hidden",
             )}
-          />
+          >
+            <span
+              style={{ height: `${Math.round(height * 100)}%` }}
+              className={cn(
+                "w-[2px] transition-colors duration-300",
+                index / BARS.length < progress
+                  ? "bg-cta"
+                  : "bg-foreground/60 group-hover:bg-foreground/85 terminal:bg-primary/55 nocturne:bg-muted-foreground/45",
+                playing && "motion-safe:animate-pulse",
+              )}
+            />
+          </span>
         ))}
       </button>
 

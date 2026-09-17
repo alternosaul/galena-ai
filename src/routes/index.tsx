@@ -490,7 +490,7 @@ function DetectorPage() {
               </TabsList>
 
               <TabsContent value="audio" className="space-y-3 flat:space-y-7">
-                <div className="space-y-2 rounded-md border border-dashed border-border p-3 transition-colors hover:border-primary/50 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-500 flat:space-y-4 flat:border-solid flat:border-rule flat:px-6 flat:py-5 flat:hover:border-cta">
+                <div className="space-y-2 rounded-md border border-dashed border-border p-3 transition-colors hover:border-primary/50 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-500 flat:space-y-4 flat:border-solid flat:border-rule flat:px-6 flat:py-5 flat:hover:border-cta @container">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground flat:flex flat:items-center flat:gap-2.5 flat:t-label flat:text-sm">
                     <span
                       aria-hidden
@@ -498,7 +498,8 @@ function DetectorPage() {
                     />
                     {t("detector.previewAudio")}
                   </p>
-                  <div className="flex flex-wrap items-center gap-2 flat:gap-4 sm:flat:flex-nowrap sm:flat:gap-5">
+                  {/* Según el ancho de la caja: angosta, el botón baja a su propia fila a todo lo ancho. */}
+                  <div className="flex flex-wrap items-center gap-2 flat:gap-4 @md:flat:flex-nowrap @md:flat:gap-5">
                     <audio
                       controls
                       preload="none"
@@ -508,14 +509,14 @@ function DetectorPage() {
                     <ExamplePlayer
                       src={withBase(PREVIEW_AUDIO)}
                       durationSec={PREVIEW_RESULT.duration_sec ?? 0}
-                      className="hidden flat:flex"
+                      className="hidden w-full flat:flex @md:w-auto"
                     />
                     <Button
                       variant="secondary"
                       size="sm"
                       onClick={() => void loadPreviewAudio()}
                       disabled={loadingPreview || normalizing}
-                      className="warp flat:h-11 flat:shrink-0 flat:border flat:border-cta flat:bg-transparent flat:px-5 flat:text-sm flat:text-cta flat:shadow-none flat:hover:bg-cta flat:hover:text-cta-foreground terminal:font-mono"
+                      className="warp flat:h-11 flat:w-full flat:shrink-0 @md:flat:w-auto flat:border flat:border-cta flat:bg-transparent flat:px-5 flat:text-sm flat:text-cta flat:shadow-none flat:hover:bg-cta flat:hover:text-cta-foreground terminal:font-mono"
                     >
                       {loadingPreview ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
