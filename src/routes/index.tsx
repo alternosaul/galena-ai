@@ -42,6 +42,7 @@ import { useAuth } from "@/lib/auth";
 import { withBase } from "@/lib/base-path";
 import type { DetectionResult } from "@/lib/detection";
 import { DEFAULT_DETECTOR_ID } from "@/lib/detectors.data";
+import { normalizeAudio, type AudioSource } from "@/lib/audio-normalize";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { modelsQueryOptions } from "@/lib/models-query";
 import { useAddToHistory } from "@/lib/history";
@@ -97,6 +98,8 @@ const LIMIT_MB = (MAX_REQUEST_BYTES / 1_000_000).toFixed(1);
 const MAX_AUDIO_BYTES = MAX_REQUEST_BYTES - 2_000;
 
 const megabytes = (bytes: number) => (bytes / 1_000_000).toFixed(2);
+/** Acepta WAV y cualquier audio que el navegador pueda decodificar; se convierte antes de enviarse. */
+const AUDIO_ACCEPT = "audio/*,.wav,.mp3,.m4a,.aac,.ogg,.oga,.opus,.flac,.webm";
 
 function DetectorPage() {
   const { t } = useI18n();
@@ -106,6 +109,8 @@ function DetectorPage() {
   const [callId, setCallId] = useState(DEFAULT_CALL_ID);
   const [base64, setBase64] = useState("");
   const [converting, setConverting] = useState(false);
+  const [normalizing, setNormalizing] = useState(false);
+  const [conversion, setConversion] = useState<AudioSource | null>(null);
   const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [fileInfo, setFileInfo] = useState<WavInfo | null>(null);
@@ -222,28 +227,48 @@ function DetectorPage() {
     setFile(next);
     setFileInfo(null);
     setFileIssues([]);
+    setConversion(null);
     if (!next) return;
-    // La cabecera WAV está al inicio; basta con leer el primer MB.
-    const head = new Uint8Array(await next.slice(0, 1024 * 1024).arrayBuffer());
-    const info = parseWavHeader(head);
-    setFileInfo(info);
-    const issues = alturWavIssues(info);
-    if (next.size > MAX_AUDIO_BYTES) issues.push({ code: "tooLarge", value: Number(LIMIT_MB) });
-    setFileIssues(issues);
+    setNormalizing(true);
+    try {
+      // Si no es WAV estéreo de 8 kHz y 16 bits, se convierte aquí antes de validarlo y enviarlo.
+      const normalized = await normalizeAudio(next);
+      const head = new Uint8Array(await normalized.file.slice(0, 1024 * 1024).arrayBuffer());
+      const info = parseWavHeader(head);
+      const issues = alturWavIssues(info);
+      if (normalized.file.size > MAX_AUDIO_BYTES) {
+        issues.push({ code: "tooLarge", value: Number(LIMIT_MB) });
+      }
+      setFile(normalized.file);
+      setFileInfo(info);
+      setFileIssues(issues);
+      setConversion(normalized.source);
+    } catch {
+      setFileIssues([{ code: "unsupported" }]);
+    } finally {
+      setNormalizing(false);
+    }
   }
 
-  /** Convierte un WAV válido a Base64, lo pone en el campo y abre la pestaña de Base64. */
+  /** Convierte un audio a WAV de 8 kHz y a Base64, lo pone en el campo y abre la pestaña de Base64. */
   async function convertToBase64(source: File) {
-    const head = new Uint8Array(await source.slice(0, 1024 * 1024).arrayBuffer());
-    const issues = alturWavIssues(parseWavHeader(head));
-    if (issues.length > 0) {
-      toast.error(issues.map((issue) => wavIssueText(t, issue)).join(" · "));
-      return;
-    }
     setConverting(true);
     try {
-      setBase64(bytesToBase64(new Uint8Array(await source.arrayBuffer())));
-      setCallId(source.name.replace(/\.wav$/i, "") || DEFAULT_CALL_ID);
+      let normalized;
+      try {
+        normalized = await normalizeAudio(source);
+      } catch {
+        toast.error(wavIssueText(t, { code: "unsupported" }));
+        return;
+      }
+      const head = new Uint8Array(await normalized.file.slice(0, 1024 * 1024).arrayBuffer());
+      const issues = alturWavIssues(parseWavHeader(head));
+      if (issues.length > 0) {
+        toast.error(issues.map((issue) => wavIssueText(t, issue)).join(" · "));
+        return;
+      }
+      setBase64(bytesToBase64(new Uint8Array(await normalized.file.arrayBuffer())));
+      setCallId(source.name.replace(/\.[^.]+$/, "") || DEFAULT_CALL_ID);
       setTab("base64");
       toast.success(t("toast.base64Ready"));
     } catch {
@@ -410,12 +435,18 @@ function DetectorPage() {
                   <span className="text-xs text-muted-foreground">{t("detector.fileHint")}</span>
                   <input
                     type="file"
-                    accept=".wav,audio/wav,audio/x-wav"
+                    accept={AUDIO_ACCEPT}
                     className="hidden"
                     onChange={(e) => void selectFile(e.target.files?.[0] ?? null)}
                   />
                 </label>
 
+                {normalizing && (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {t("detector.normalizing")}
+                  </p>
+                )}
                 {file && fileInvalid && (
                   <ul className="space-y-1 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                     {fileIssues.map((issue) => (
@@ -436,11 +467,19 @@ function DetectorPage() {
                     })}
                   </p>
                 )}
+                {file && conversion && !normalizing && (
+                  <p className="text-xs text-muted-foreground">
+                    {t("detector.normalized", {
+                      source: `${conversion.sampleRate ? `${conversion.sampleRate} Hz` : conversion.format} · ${conversion.channels} ch`,
+                    })}
+                    {conversion.channels === 1 && ` ${t("detector.monoNote")}`}
+                  </p>
+                )}
 
                 <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={analyzeAudio}
-                    disabled={loading || !file || fileInvalid}
+                    disabled={loading || normalizing || !file || fileInvalid}
                     className="w-full sm:w-auto"
                   >
                     <Play className="mr-2 h-4 w-4" />
@@ -449,7 +488,7 @@ function DetectorPage() {
                   <Button
                     variant="outline"
                     onClick={() => file && void convertToBase64(file)}
-                    disabled={!file || fileInvalid || converting}
+                    disabled={!file || fileInvalid || converting || normalizing}
                     className="w-full sm:w-auto"
                   >
                     {converting ? (
@@ -517,7 +556,7 @@ function DetectorPage() {
                       {t("detector.convertWav")}
                       <input
                         type="file"
-                        accept=".wav,audio/wav,audio/x-wav"
+                        accept={AUDIO_ACCEPT}
                         className="hidden"
                         onChange={(e) => {
                           const picked = e.target.files?.[0];
@@ -724,6 +763,8 @@ function wavIssueText(
       return t("wav.empty");
     case "tooLarge":
       return t("wav.tooLarge", { value: issue.value });
+    case "unsupported":
+      return t("wav.unsupported");
   }
 }
 

@@ -37,7 +37,8 @@ export type WavIssue =
   | { code: "channels"; value: number }
   | { code: "duration"; value: number }
   | { code: "empty" }
-  | { code: "tooLarge"; value: number };
+  | { code: "tooLarge"; value: number }
+  | { code: "unsupported" };
 
 /** Devuelve el formato y la duración del WAV, o null si la cabecera no es válida. */
 export function parseWavHeader(bytes: Uint8Array): WavInfo | null {
@@ -104,6 +105,8 @@ export function describeWavIssue(issue: WavIssue): string {
       return "El archivo de audio está vacío";
     case "tooLarge":
       return `El archivo supera ${issue.value} MB`;
+    case "unsupported":
+      return "El navegador no pudo leer el archivo de audio";
   }
 }
 
@@ -127,6 +130,44 @@ export function base64ToBytes(base64: string): Uint8Array | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Codifica muestras float (-1..1) como WAV PCM de 16 bits, con el mismo redondeo que el pipeline de
+ * entrenamiento (round(x * 32767), recortado al rango de int16).
+ */
+export function encodePcm16Wav(
+  channels: Float32Array[],
+  sampleRate: number,
+): Uint8Array<ArrayBuffer> {
+  const numChannels = channels.length;
+  const frames = channels[0]?.length ?? 0;
+  const blockAlign = numChannels * 2;
+  const dataBytes = frames * blockAlign;
+  const buffer = new ArrayBuffer(44 + dataBytes);
+  const view = new DataView(buffer);
+  writeFourCC(view, 0, "RIFF");
+  view.setUint32(4, 36 + dataBytes, true);
+  writeFourCC(view, 8, "WAVE");
+  writeFourCC(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, WAVE_FORMAT_PCM, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * blockAlign, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  writeFourCC(view, 36, "data");
+  view.setUint32(40, dataBytes, true);
+  let offset = 44;
+  for (let frame = 0; frame < frames; frame++) {
+    for (let channel = 0; channel < numChannels; channel++) {
+      const sample = channels[channel]?.[frame] ?? 0;
+      view.setInt16(offset, Math.max(-32768, Math.min(32767, Math.round(sample * 32767))), true);
+      offset += 2;
+    }
+  }
+  return new Uint8Array(buffer);
 }
 
 /** WAV estéreo de 8 kHz en silencio, en base64 (payload de ejemplo que la API acepta). */
