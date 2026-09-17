@@ -27,10 +27,16 @@ export default defineConfig(({ command, mode }) => {
         server: { entry: "server" },
       }),
       // Por defecto compila un servidor Node autónomo (.output/server/index.mjs) para la VPS
-      // detrás de nginx. NITRO_PRESET=vercel o cloudflare_module compila para esas plataformas,
-      // que ejecutan las rutas /api/public/* como funciones en su capa gratuita.
+      // detrás de nginx. En Vercel (que define VERCEL=1 al compilar) usa el preset vercel, que
+      // escribe .vercel/output y ejecuta las rutas /api/public/* como funciones. NITRO_PRESET
+      // tiene prioridad sobre ambos (p. ej. cloudflare_module).
       ...(command === "build"
-        ? [nitro({ preset: process.env["NITRO_PRESET"] ?? "node-server" })]
+        ? [
+            nitro({
+              preset:
+                process.env["NITRO_PRESET"] ?? (process.env["VERCEL"] ? "vercel" : "node-server"),
+            }),
+          ]
         : []),
       viteReact(),
     ],
