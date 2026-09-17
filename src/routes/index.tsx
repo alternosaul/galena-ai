@@ -515,7 +515,7 @@ function DetectorPage() {
                       size="sm"
                       onClick={() => void loadPreviewAudio()}
                       disabled={loadingPreview || normalizing}
-                      className="flat:h-11 flat:shrink-0 flat:border flat:border-cta flat:bg-transparent flat:px-5 flat:text-sm flat:text-cta flat:shadow-none flat:hover:bg-cta flat:hover:text-cta-foreground terminal:font-mono"
+                      className="warp flat:h-11 flat:shrink-0 flat:border flat:border-cta flat:bg-transparent flat:px-5 flat:text-sm flat:text-cta flat:shadow-none flat:hover:bg-cta flat:hover:text-cta-foreground terminal:font-mono"
                     >
                       {loadingPreview ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -541,7 +541,7 @@ function DetectorPage() {
                   onDragLeave={() => setDragging(false)}
                   onDrop={onDrop}
                   className={cn(
-                    "dropzone-warp group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-secondary/40 px-6 py-12 text-center transition-all duration-300 hover:border-primary hover:bg-primary/5 hover:shadow-md motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500",
+                    "warp group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-secondary/40 px-6 py-12 text-center transition-all duration-300 hover:border-primary hover:bg-primary/5 hover:shadow-md motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500",
                     "flat:gap-5 flat:border-[1.5px] flat:border-rule/50 flat:bg-transparent flat:px-8 flat:py-16 flat:hover:border-transparent flat:hover:bg-cta/5 flat:hover:shadow-none",
                     dragging &&
                       "border-primary bg-primary/10 motion-safe:scale-[1.02] flat:bg-cta/10",
