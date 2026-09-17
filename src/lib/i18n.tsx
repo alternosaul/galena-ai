@@ -93,6 +93,13 @@ const es = {
   "detector.payloadPreview": "JSON que se enviará",
   "detector.payloadPending": "<pega aquí el audio en Base64>",
   "detector.copyBase64": "Copiar Base64",
+  "detector.demo": "Demostración",
+  "detector.exampleHuman": "Ejemplo de audio humano",
+  "detector.exampleAi": "Ejemplo de audio IA",
+  "detector.demoHint":
+    "Llamadas reales del set de validación, etiquetadas como humana e IA. Cargan el audio en Base64 listo para analizar.",
+  "toast.exampleLoaded": "{name} cargado",
+  "toast.exampleError": "No se pudo cargar el ejemplo",
 
   // Historial
   "history.title": "Historial",
@@ -460,6 +467,13 @@ const en: Record<TKey, string> = {
   "detector.payloadPreview": "JSON to be sent",
   "detector.payloadPending": "<paste the Base64 audio here>",
   "detector.copyBase64": "Copy Base64",
+  "detector.demo": "Demo",
+  "detector.exampleHuman": "Human audio example",
+  "detector.exampleAi": "AI audio example",
+  "detector.demoHint":
+    "Real calls from the validation set, labeled human and AI. They load the Base64 audio ready to analyze.",
+  "toast.exampleLoaded": "{name} loaded",
+  "toast.exampleError": "The example could not be loaded",
 
   "history.title": "History",
   "history.subtitle": "Log of the latest detection requests.",

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  Bot,
   Clock,
   Copy,
   FileAudio,
@@ -13,6 +14,7 @@ import {
   Mountain,
   Play,
   Upload,
+  UserRound,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -79,6 +81,17 @@ type ErrorBody = { error?: string; detail?: { field: string; message: string }[]
 type InputTab = "audio" | "base64";
 
 const DEFAULT_CALL_ID = "call_demo_001";
+
+/** Llamadas reales del set de validación (etiquetadas en el manifiesto), servidas desde public/examples. */
+const EXAMPLES = [
+  {
+    id: "human",
+    file: "/examples/ejemplo-humano.json",
+    label: "detector.exampleHuman",
+    icon: UserRound,
+  },
+  { id: "ai", file: "/examples/ejemplo-ia.json", label: "detector.exampleAi", icon: Bot },
+] as const;
 const LIMIT_MB = (MAX_REQUEST_BYTES / 1_000_000).toFixed(1);
 /** Margen para la cabecera multipart al subir el archivo. */
 const MAX_AUDIO_BYTES = MAX_REQUEST_BYTES - 2_000;
@@ -93,6 +106,7 @@ function DetectorPage() {
   const [callId, setCallId] = useState(DEFAULT_CALL_ID);
   const [base64, setBase64] = useState("");
   const [converting, setConverting] = useState(false);
+  const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [fileInfo, setFileInfo] = useState<WavInfo | null>(null);
   const [fileIssues, setFileIssues] = useState<WavIssue[]>([]);
@@ -236,6 +250,25 @@ function DetectorPage() {
       toast.error(t("toast.convertError"));
     } finally {
       setConverting(false);
+    }
+  }
+
+  /** Carga un ejemplo de demostración: su audio en Base64 y su call_id. */
+  async function loadExample(example: (typeof EXAMPLES)[number]) {
+    setLoadingExample(example.id);
+    try {
+      const res = await fetch(withBase(example.file));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { call_id?: unknown; audio_base64?: unknown };
+      if (typeof data.audio_base64 !== "string") throw new Error("audio_base64 ausente");
+      setBase64(data.audio_base64);
+      if (typeof data.call_id === "string") setCallId(data.call_id);
+      setTab("base64");
+      toast.success(t("toast.exampleLoaded", { name: t(example.label) }));
+    } catch {
+      toast.error(t("toast.exampleError"));
+    } finally {
+      setLoadingExample(null);
     }
   }
 
@@ -430,6 +463,34 @@ function DetectorPage() {
               </TabsContent>
 
               <TabsContent value="base64" className="space-y-4">
+                <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("detector.demo")}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {EXAMPLES.map((example) => {
+                      const Icon = example.icon;
+                      return (
+                        <Button
+                          key={example.id}
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => void loadExample(example)}
+                          disabled={loadingExample !== null}
+                        >
+                          {loadingExample === example.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Icon className="mr-2 h-4 w-4" />
+                          )}
+                          {t(example.label)}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t("detector.demoHint")}</p>
+                </div>
+
                 <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
                   <div className="space-y-1.5">
                     <Label htmlFor="call-id">{t("detector.callId")}</Label>
