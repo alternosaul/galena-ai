@@ -15,11 +15,13 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { THEMES, useTheme, type ThemeId } from "@/lib/theme";
 
 export function AppHeader() {
   const { t } = useI18n();
+  const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur flat:h-20 flat:border-rule flat:bg-background flat:backdrop-blur-none md:flat:h-[6.25rem] md:flat:px-10">
@@ -30,8 +32,12 @@ export function AppHeader() {
 
       <div className="ml-auto flex items-center gap-2 flat:gap-3 md:flat:gap-8">
         <PreferenceControls />
-        <Separator orientation="vertical" className="mx-1 h-6 flat:hidden" />
-        <UserMenu />
+        {user && (
+          <>
+            <Separator orientation="vertical" className="mx-1 h-6 flat:hidden" />
+            <UserMenu />
+          </>
+        )}
       </div>
     </header>
   );
@@ -42,7 +48,7 @@ export function PreferenceControls() {
   const { t, lang, setLang } = useI18n();
 
   return (
-    <div className="flex items-center gap-2 flat:gap-3 md:flat:gap-8">
+    <div className="flex items-center gap-2 flat:gap-5 md:flat:gap-8">
       <ToggleGroup
         type="single"
         size="sm"
@@ -107,6 +113,7 @@ export function ThemeSelect() {
           className="gap-2 flat:h-auto flat:border-0 flat:bg-transparent flat:px-0 flat:py-1 flat:t-label flat:text-sm flat:text-muted-foreground flat:shadow-none flat:hover:bg-transparent flat:hover:text-foreground flat:hover:shadow-none"
         >
           <Palette className="h-4 w-4 flat:hidden" />
+          <span className="text-muted-foreground flat:text-[inherit]">{t("theme.label")}:</span>
           <ThemeSwatch id={current.id} />
           <span className="hidden sm:inline">{t(current.label)}</span>
           <ChevronDown className="h-3.5 w-3.5 opacity-60" />
