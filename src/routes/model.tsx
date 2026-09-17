@@ -108,7 +108,9 @@ function ModelPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("model.title")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight flat:t-display flat:text-5xl md:flat:text-6xl editorial:font-extrabold">
+            {t("model.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">{t("model.subtitle")}</p>
         </div>
         <p className="flex max-w-md items-start gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
