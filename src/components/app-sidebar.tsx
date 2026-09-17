@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, History, Plug, Brain } from "lucide-react";
+import { Activity, History, Brain } from "lucide-react";
 
 import { BrandLogo } from "@/components/brand-logo";
 import {
@@ -20,12 +20,11 @@ import { useI18n, type TKey } from "@/lib/i18n";
 
 const items: {
   title: TKey;
-  url: "/" | "/history" | "/api-config" | "/model";
+  url: "/" | "/history" | "/model";
   icon: typeof Activity;
 }[] = [
   { title: "nav.detector", url: "/", icon: Activity },
   { title: "nav.history", url: "/history", icon: History },
-  { title: "nav.api", url: "/api-config", icon: Plug },
   { title: "nav.model", url: "/model", icon: Brain },
 ];
 
