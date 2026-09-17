@@ -32,7 +32,6 @@ import {
   SelectGroup,
   SelectItem,
   SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -432,17 +431,6 @@ function DetectorPage() {
                         {m.name}
                         <span className="font-mono text-xs text-muted-foreground">#{m.rank}</span>
                       </span>
-                    </SelectItem>
-                  ))}
-              </SelectGroup>
-              <SelectSeparator />
-              <SelectGroup>
-                <SelectLabel>{t("detector.experimental")}</SelectLabel>
-                {(offered ?? [])
-                  .filter((m) => m.rank === null)
-                  .map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name}
                     </SelectItem>
                   ))}
               </SelectGroup>

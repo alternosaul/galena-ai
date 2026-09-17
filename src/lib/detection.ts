@@ -24,7 +24,7 @@ export const detectionResultSchema = z.object({
   confidence: z.number().min(0).max(1),
   /** P(voz sintética) según el detector, entre 0 y 1. */
   p_synthetic: z.number().min(0).max(1).optional(),
-  /** id del detector: everest | fuji | montblanc | galena-full | galena-client-only | acoustic-baseline */
+  /** id del detector: everest | fuji | montblanc */
   model: z.string(),
   threshold: z.number().min(0).max(1).optional(),
   /** Header X-Detection-ID de la API de modelos. */

@@ -65,7 +65,6 @@ function ModelPage() {
   const recommended = models
     .filter((m) => m.rank !== null)
     .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
-  const experimental = models.filter((m) => m.rank === null);
   const emptyMessage = t("model.notApplicable");
   const chartKey = `${selected.id}-${dataset}`;
 
@@ -128,22 +127,6 @@ function ModelPage() {
               models={models}
               active={m.id === selected.id}
               onSelect={() => setSelectedId(m.id)}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <SectionTitle>{t("model.experimental")}</SectionTitle>
-        <div className="grid gap-3 md:grid-cols-3" role="radiogroup">
-          {experimental.map((m) => (
-            <ModelCard
-              key={m.id}
-              model={m}
-              models={models}
-              active={m.id === selected.id}
-              onSelect={() => setSelectedId(m.id)}
-              compact
             />
           ))}
         </div>

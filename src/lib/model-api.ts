@@ -239,8 +239,13 @@ export async function getModelApiHealth(): Promise<ModelApiHealth> {
       ok: parsed.data.status === "ok",
       latency_ms: Date.now() - started,
       default_detector: parsed.data.default_detector ?? null,
-      available_detectors: parsed.data.available_detectors ?? [],
-      thresholds: parsed.data.thresholds ?? {},
+      // Solo se exponen los detectores del catálogo público, aunque la API de modelos cargue más.
+      available_detectors: (parsed.data.available_detectors ?? []).filter((id) =>
+        Boolean(findDetector(id)),
+      ),
+      thresholds: Object.fromEntries(
+        Object.entries(parsed.data.thresholds ?? {}).filter(([id]) => findDetector(id)),
+      ),
       error: null,
     };
   } catch (error) {

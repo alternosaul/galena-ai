@@ -343,9 +343,7 @@ const es = {
 
   // Catálogo de 6 detectores (services/model-api)
   "detector.recommended": "Recomendados",
-  "detector.experimental": "Experimentales",
   "model.recommended": "Recomendados · ranking general",
-  "model.experimental": "Experimentales",
   "model.experimentalBadge": "Experimental",
   "model.dataset": "Dataset",
   "model.datasetCalls": "Llamadas Altur · val",
@@ -723,9 +721,7 @@ const en: Record<TKey, string> = {
   "pw.hide": "Hide password",
 
   "detector.recommended": "Recommended",
-  "detector.experimental": "Experimental",
   "model.recommended": "Recommended · overall ranking",
-  "model.experimental": "Experimental",
   "model.experimentalBadge": "Experimental",
   "model.dataset": "Dataset",
   "model.datasetCalls": "Altur calls · val",
