@@ -52,7 +52,7 @@ export type ConfusionCounts = {
 /** Conjuntos de evaluación (datos no vistos por cada modelo). */
 export type ModelDataset = "Altur" | "AlternativeData";
 
-/** Evaluación de un detector (tabla detector_evaluations en Supabase). */
+/** Evaluación de un detector (métricas del catálogo en detectors.data.ts). */
 export type ModelEvaluation = {
   dataset: ModelDataset;
   split: "train" | "val" | "test" | "alternate";
@@ -71,7 +71,7 @@ export type ModelEvaluation = {
   train_only_reference: boolean;
 };
 
-/** Detector de la API de modelos (tabla detectors en Supabase). */
+/** Detector de la API de modelos. */
 export type ModelInfo = {
   id: string;
   name: string;

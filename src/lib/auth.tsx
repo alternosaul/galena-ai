@@ -1,4 +1,3 @@
-import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import {
   createContext,
   useCallback,
@@ -10,13 +9,11 @@ import {
   type ReactNode,
 } from "react";
 
-import { withBase } from "./base-path";
-import { getSupabase, setRememberSession } from "./supabase";
-
 /**
- * Autenticación con Supabase Auth (email + contraseña, Google y GitHub).
- * El perfil y las preferencias viven en public.profiles y public.user_preferences
- * (los crea el trigger handle_new_user al registrarse); RLS limita cada fila a su dueño.
+ * Autenticación de demostración, sin backend. El panel de login acepta cualquier correo y
+ * contraseña que pasen la validación del formulario (y los botones de Google/GitHub) y guarda un
+ * usuario de demo en este navegador (localStorage). Ninguna ruta exige sesión: iniciarla solo
+ * personaliza el perfil y las preferencias.
  */
 
 export type AuthProviderId = "email" | "google" | "github";
@@ -55,14 +52,14 @@ type SignUpResult = { user: User | null; needsConfirmation: boolean };
 type AuthContextValue = {
   status: Status;
   user: User | null;
-  /** true tras abrir un enlace de recuperación: permite fijar contraseña sin la actual. */
+  /** true tras un enlace de recuperación de contraseña; la demo no los envía, así que siempre es false. */
   recovering: boolean;
   login: (credentials: { email: string; password: string; remember: boolean }) => Promise<User>;
   signUp: (input: { name: string; email: string; password: string }) => Promise<SignUpResult>;
   loginWithProvider: (provider: Exclude<AuthProviderId, "email">) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   logout: () => Promise<void>;
-  /** Devuelve true si el cambio de correo quedó pendiente de confirmación. */
+  /** Devuelve true si el cambio de correo quedó pendiente de confirmación (nunca, en la demo). */
   updateProfile: (
     patch: Partial<Pick<User, "name" | "email" | "avatarUrl" | "preferences">>,
   ) => Promise<{ emailPending: boolean }>;
@@ -70,6 +67,8 @@ type AuthContextValue = {
 };
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+const STORAGE_KEY = "galena.demo-user";
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   emailNotifications: true,
@@ -87,52 +86,36 @@ function nameFromEmail(email: string) {
   return name || "User";
 }
 
-function asProvider(value: unknown): AuthProviderId {
-  return value === "google" || value === "github" ? value : "email";
-}
-
-function authFailure(error: { code?: string | undefined; message: string }) {
-  return new AuthFailure(error.code ?? "unknown", error.message);
-}
-
-/** Construye el User de la app a partir de la sesión, el perfil y las preferencias. */
-async function loadUser(authUser: SupabaseUser): Promise<User> {
-  const supabase = getSupabase();
-  const [{ data: profile }, { data: prefs }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle(),
-    supabase.from("user_preferences").select("*").eq("user_id", authUser.id).maybeSingle(),
-  ]);
-  const email = authUser.email ?? profile?.email ?? "";
-  const passwordUpdatedAt = authUser.user_metadata?.["password_updated_at"];
+function demoUser(input: { email: string; provider: AuthProviderId; name?: string }): User {
+  const email = input.email.trim().toLowerCase();
   return {
-    id: authUser.id,
-    name: profile?.full_name || nameFromEmail(email),
+    id: `demo:${email}`,
+    name: input.name?.trim() || nameFromEmail(email),
     email,
-    avatarUrl: profile?.avatar_url ?? null,
-    provider: asProvider(profile?.provider ?? authUser.app_metadata?.["provider"]),
-    createdAt: profile?.created_at ?? authUser.created_at,
-    passwordUpdatedAt: typeof passwordUpdatedAt === "string" ? passwordUpdatedAt : null,
-    preferences: prefs
-      ? {
-          emailNotifications: prefs.email_notifications,
-          aiAlerts: prefs.ai_alerts,
-          autoSave: prefs.auto_save_history,
-        }
-      : DEFAULT_PREFERENCES,
+    avatarUrl: null,
+    provider: input.provider,
+    createdAt: new Date().toISOString(),
+    passwordUpdatedAt: null,
+    preferences: DEFAULT_PREFERENCES,
   };
 }
 
-/** Sube la foto (data URL ya recortada) al bucket avatars y devuelve su URL pública. */
-async function uploadAvatar(userId: string, dataUrl: string) {
-  const supabase = getSupabase();
-  const blob = await (await fetch(dataUrl)).blob();
-  const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
-  const path = `${userId}/avatar-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage
-    .from("avatars")
-    .upload(path, blob, { contentType: blob.type, upsert: true });
-  if (error) throw new AuthFailure("avatar_upload", error.message);
-  return supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+function readStoredUser(): User | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as User) : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeUser(user: User | null) {
+  try {
+    if (user) localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Almacenamiento lleno o no disponible: la sesión dura lo que dure la pestaña.
+  }
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -140,190 +123,80 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const [user, setUser] = useState<User | null>(null);
-  const [recovering, setRecovering] = useState(false);
   const userRef = useRef<User | null>(null);
   userRef.current = user;
 
-  const applySession = useCallback(async (session: Session | null) => {
-    if (!session) {
-      setUser(null);
-      setStatus("unauthenticated");
-      return null;
-    }
-    try {
-      const next = await loadUser(session.user);
-      setUser(next);
-      setStatus("authenticated");
-      return next;
-    } catch (error) {
-      console.error("No se pudo cargar el perfil", error);
-      setUser(null);
-      setStatus("unauthenticated");
-      return null;
-    }
+  // localStorage solo existe en el navegador: se lee después de hidratar.
+  useEffect(() => {
+    const stored = readStoredUser();
+    setUser(stored);
+    setStatus(stored ? "authenticated" : "unauthenticated");
   }, []);
 
-  useEffect(() => {
-    const supabase = getSupabase();
-    let active = true;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (active) void applySession(data.session);
-    });
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY") setRecovering(true);
-      if (event === "SIGNED_OUT") setRecovering(false);
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        // Supabase recomienda no llamar a su cliente dentro del callback: se difiere un tick.
-        setTimeout(() => {
-          if (active) void applySession(session);
-        }, 0);
-      }
-    });
-    return () => {
-      active = false;
-      listener.subscription.unsubscribe();
-    };
-  }, [applySession]);
+  const signIn = useCallback((next: User) => {
+    storeUser(next);
+    setUser(next);
+    setStatus("authenticated");
+    return next;
+  }, []);
 
   const login = useCallback<AuthContextValue["login"]>(
-    async ({ email, password, remember }) => {
-      setRememberSession(remember);
-      const { data, error } = await getSupabase().auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-      if (error) throw authFailure(error);
-      const next = await applySession(data.session);
-      if (!next) throw new AuthFailure("profile_unavailable");
-      return next;
-    },
-    [applySession],
+    async ({ email }) => signIn(demoUser({ email, provider: "email" })),
+    [signIn],
   );
 
   const signUp = useCallback<AuthContextValue["signUp"]>(
-    async ({ name, email, password }) => {
-      setRememberSession(true);
-      const { data, error } = await getSupabase().auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: { full_name: name.trim() },
-          emailRedirectTo: `${window.location.origin}${withBase("/")}`,
-        },
-      });
-      if (error) throw authFailure(error);
-      // Con "Confirm email" activo no hay sesión hasta confirmar; un correo ya registrado
-      // devuelve un usuario sin identidades (Supabase no revela si existe).
-      if (data.user && data.user.identities?.length === 0) {
-        throw new AuthFailure("user_already_exists");
-      }
-      if (!data.session) return { user: null, needsConfirmation: true };
-      return { user: await applySession(data.session), needsConfirmation: false };
-    },
-    [applySession],
+    async ({ name, email }) => ({
+      user: signIn(demoUser({ name, email, provider: "email" })),
+      needsConfirmation: false,
+    }),
+    [signIn],
   );
 
-  const loginWithProvider = useCallback<AuthContextValue["loginWithProvider"]>(async (provider) => {
-    setRememberSession(true);
-    const { error } = await getSupabase().auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}${withBase("/")}` },
-    });
-    if (error) throw authFailure(error);
-  }, []);
-
-  const requestPasswordReset = useCallback<AuthContextValue["requestPasswordReset"]>(
-    async (email) => {
-      const { error } = await getSupabase().auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-        redirectTo: `${window.location.origin}${withBase("/profile")}`,
-      });
-      if (error) throw authFailure(error);
+  const loginWithProvider = useCallback<AuthContextValue["loginWithProvider"]>(
+    async (provider) => {
+      signIn(demoUser({ email: `demo.${provider}@galenia.demo`, provider }));
     },
-    [],
+    [signIn],
   );
+
+  const requestPasswordReset = useCallback<
+    AuthContextValue["requestPasswordReset"]
+  >(async () => {}, []);
 
   const logout = useCallback(async () => {
-    await getSupabase().auth.signOut();
+    storeUser(null);
     setUser(null);
     setStatus("unauthenticated");
   }, []);
 
-  const updateProfile = useCallback<AuthContextValue["updateProfile"]>(async (patch) => {
-    const current = userRef.current;
-    if (!current) return { emailPending: false };
-    const supabase = getSupabase();
-    const profileUpdate: { full_name?: string; avatar_url?: string | null } = {};
-    const next: User = { ...current };
-
-    if (patch.name !== undefined && patch.name !== current.name) {
-      profileUpdate.full_name = patch.name;
-      next.name = patch.name;
-    }
-    if (patch.avatarUrl !== undefined && patch.avatarUrl !== current.avatarUrl) {
-      const url = patch.avatarUrl ? await uploadAvatar(current.id, patch.avatarUrl) : null;
-      profileUpdate.avatar_url = url;
-      next.avatarUrl = url;
-    }
-    if (Object.keys(profileUpdate).length) {
-      const { error } = await supabase.from("profiles").update(profileUpdate).eq("id", current.id);
-      if (error) throw authFailure(error);
-    }
-
-    if (patch.preferences) {
-      const { error } = await supabase
-        .from("user_preferences")
-        .update({
-          email_notifications: patch.preferences.emailNotifications,
-          ai_alerts: patch.preferences.aiAlerts,
-          auto_save_history: patch.preferences.autoSave,
-        })
-        .eq("user_id", current.id);
-      if (error) throw authFailure(error);
-      next.preferences = patch.preferences;
-    }
-
-    let emailPending = false;
-    if (patch.email !== undefined && patch.email !== current.email) {
-      const { data, error } = await supabase.auth.updateUser({ email: patch.email });
-      if (error) throw authFailure(error);
-      // Con confirmación de cambio de correo, el correo actual sigue vigente hasta confirmar.
-      emailPending = data.user.email !== patch.email;
-      if (!emailPending) next.email = patch.email;
-    }
-
-    setUser(next);
-    return { emailPending };
-  }, []);
-
-  const changePassword = useCallback<AuthContextValue["changePassword"]>(
-    async (currentPassword, nextPassword) => {
+  const updateProfile = useCallback<AuthContextValue["updateProfile"]>(
+    async (patch) => {
       const current = userRef.current;
-      if (!current) return;
-      const supabase = getSupabase();
-      if (currentPassword) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: current.email,
-          password: currentPassword,
-        });
-        if (error) throw new AuthFailure("wrong_password", error.message);
-      }
-      const passwordUpdatedAt = new Date().toISOString();
-      const { error } = await supabase.auth.updateUser({
-        password: nextPassword,
-        data: { password_updated_at: passwordUpdatedAt },
+      if (!current) return { emailPending: false };
+      signIn({
+        ...current,
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.email !== undefined ? { email: patch.email } : {}),
+        ...(patch.avatarUrl !== undefined ? { avatarUrl: patch.avatarUrl } : {}),
+        ...(patch.preferences !== undefined ? { preferences: patch.preferences } : {}),
       });
-      if (error) throw authFailure(error);
-      setRecovering(false);
-      setUser({ ...current, passwordUpdatedAt });
+      return { emailPending: false };
     },
-    [],
+    [signIn],
   );
+
+  const changePassword = useCallback<AuthContextValue["changePassword"]>(async () => {
+    const current = userRef.current;
+    if (!current) return;
+    signIn({ ...current, passwordUpdatedAt: new Date().toISOString() });
+  }, [signIn]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
       user,
-      recovering,
+      recovering: false,
       login,
       signUp,
       loginWithProvider,
@@ -335,7 +208,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       status,
       user,
-      recovering,
       login,
       signUp,
       loginWithProvider,

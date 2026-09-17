@@ -38,8 +38,7 @@ import { EXAMPLE_PAYLOAD, type DetectionResult } from "@/lib/detection";
 import { DEFAULT_DETECTOR_ID } from "@/lib/detectors.data";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { modelsQueryOptions } from "@/lib/models-query";
-import { useInvalidateHistory } from "@/lib/history";
-import { authHeaders } from "@/lib/supabase";
+import { useAddToHistory } from "@/lib/history";
 import { cn } from "@/lib/utils";
 import { alturWavIssues, parseWavHeader, type WavInfo, type WavIssue } from "@/lib/wav";
 
@@ -77,15 +76,7 @@ function DetectorPage() {
   const [result, setResult] = useState<DetectionResult | null>(null);
 
   const { data: models } = useQuery(modelsQueryOptions);
-  const invalidateHistory = useInvalidateHistory();
-
-  /** Token de sesión (el servidor guarda la detección a tu nombre) y preferencia de historial. */
-  async function requestHeaders(): Promise<Record<string, string>> {
-    return {
-      ...(await authHeaders()),
-      ...(user?.preferences.autoSave === false ? { "X-Galena-Save": "0" } : {}),
-    };
-  }
+  const addToHistory = useAddToHistory();
 
   useEffect(() => {
     setModel(loadApiSettings().defaultModel);
@@ -120,7 +111,8 @@ function DetectorPage() {
     }
     const detection = body as DetectionResult;
     setResult(detection);
-    void invalidateHistory();
+    // La demo guarda el historial en este navegador; la preferencia autoSave lo desactiva.
+    if (user?.preferences.autoSave !== false) addToHistory(detection);
     toast.success(t("toast.success"));
   }
 
@@ -139,7 +131,7 @@ function DetectorPage() {
         withBase(`/api/public/detect?detector=${encodeURIComponent(model)}`),
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...(await requestHeaders()) },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(parsed),
         },
       );
@@ -178,7 +170,6 @@ function DetectorPage() {
         withBase(`/api/public/detect/audio?detector=${encodeURIComponent(model)}`),
         {
           method: "POST",
-          headers: await requestHeaders(),
           body: form,
         },
       );

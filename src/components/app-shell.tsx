@@ -28,7 +28,7 @@ export function AppShell() {
   }, [status, isPublic, navigate]);
 
   if (isPublic) return <Outlet />;
-  // Solo se espera mientras Supabase resuelve una sesión previa; si no hay, se entra igual.
+  // Solo se espera mientras se lee el usuario de demo guardado; si no hay, se entra igual.
   if (status === "loading") return <SplashScreen />;
 
   return (

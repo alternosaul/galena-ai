@@ -88,7 +88,7 @@ const es = {
   "history.detail": "Detalle de la solicitud",
   "history.raw": "JSON de respuesta",
   "history.showing": "Mostrando {shown} de {total}",
-  "history.sampleNote": "Guardado en tu cuenta (Supabase).",
+  "history.sampleNote": "Guardado en este navegador.",
   "history.loading": "Cargando historial…",
   "history.loadError": "No se pudo cargar el historial.",
 
@@ -431,7 +431,7 @@ const en: Record<TKey, string> = {
   "history.detail": "Request detail",
   "history.raw": "Response JSON",
   "history.showing": "Showing {shown} of {total}",
-  "history.sampleNote": "Saved to your account (Supabase).",
+  "history.sampleNote": "Saved in this browser.",
   "history.loading": "Loading history…",
   "history.loadError": "History could not be loaded.",
 

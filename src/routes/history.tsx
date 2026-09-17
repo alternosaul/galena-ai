@@ -31,7 +31,6 @@ import { ConfidenceGauge } from "@/components/confidence-gauge";
 import { ResultBadge, VerdictPill } from "@/components/result-badge";
 import type { DetectionResult } from "@/lib/detection";
 import { useI18n } from "@/lib/i18n";
-import { useAuth } from "@/lib/auth";
 import { useClearHistory, useDetectionHistory } from "@/lib/history";
 import { cn } from "@/lib/utils";
 
@@ -49,10 +48,9 @@ type Verdict = "all" | "ai" | "human";
 
 function HistoryPage() {
   const { t, locale } = useI18n();
-  const { user } = useAuth();
-  const historyQuery = useDetectionHistory(user?.id);
+  const historyQuery = useDetectionHistory();
   const history = useMemo(() => historyQuery.data ?? [], [historyQuery.data]);
-  const clear = useClearHistory(user?.id);
+  const clear = useClearHistory();
   const [query, setQuery] = useState("");
   const [verdict, setVerdict] = useState<Verdict>("all");
   const [model, setModel] = useState("all");

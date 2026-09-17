@@ -9,9 +9,7 @@ import type { ConfusionCounts, ModelEvaluation, ModelInfo } from "./detection";
  * siempre en datos no vistos por el modelo:
  *   - Llamadas Altur val: 71 llamadas (37 humanas, 34 IA).
  *   - AlternativeData test: 20,122 clips, con generadores (xtts-v1, fish-speech) y speakers nuevos.
- * Mismo contenido que supabase/migrations/20260913000800_reference_data.sql.
- *
- * TODO(Supabase): leer de detectors + detector_evaluations cuando haya credenciales.
+ * Es la fuente del catálogo: la demo no usa base de datos.
  */
 
 const EVALUATED_AT = "2026-09-13T00:00:00Z";

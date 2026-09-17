@@ -8,7 +8,7 @@ import { defineConfig, loadEnv } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig(({ command, mode }) => {
-  // En desarrollo, las rutas de servidor leen .env (SUPABASE_SECRET_KEY, MODEL_API_URL…) desde
+  // En desarrollo, las rutas de servidor leen .env (MODEL_API_URL…) desde
   // process.env. En la VPS las define systemd (/etc/galena-ai.env).
   if (command === "serve") {
     for (const [key, value] of Object.entries(loadEnv(mode, process.cwd(), ""))) {
