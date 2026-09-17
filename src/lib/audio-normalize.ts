@@ -1,10 +1,4 @@
-import {
-  ALTUR_CHANNELS,
-  ALTUR_SAMPLE_RATE,
-  alturWavIssues,
-  encodePcm16Wav,
-  parseWavHeader,
-} from "./wav";
+import { API_CHANNELS, API_SAMPLE_RATE, apiWavIssues, encodePcm16Wav, parseWavHeader } from "./wav";
 
 /**
  * Conversión en el navegador al formato de la API de modelos: WAV estéreo, 8000 Hz, PCM de 16 bits.
@@ -43,17 +37,17 @@ export async function normalizeAudio(file: File): Promise<NormalizedAudio> {
   const head = new Uint8Array(await file.slice(0, 1024 * 1024).arrayBuffer());
   const info = parseWavHeader(head);
   // Duración o archivo vacío no se arreglan convirtiendo: la validación del formulario los reporta.
-  if (info && !alturWavIssues(info).some((issue) => FORMAT_ISSUES.has(issue.code))) {
+  if (info && !apiWavIssues(info).some((issue) => FORMAT_ISSUES.has(issue.code))) {
     return { file, source: null };
   }
 
   const buffer = await decodeAt8k(await file.arrayBuffer());
   const client = buffer.getChannelData(0);
   const agent =
-    buffer.numberOfChannels >= ALTUR_CHANNELS
+    buffer.numberOfChannels >= API_CHANNELS
       ? buffer.getChannelData(1)
       : new Float32Array(client.length);
-  const wav = encodePcm16Wav([client, agent], ALTUR_SAMPLE_RATE);
+  const wav = encodePcm16Wav([client, agent], API_SAMPLE_RATE);
 
   const base = file.name.replace(/\.[^.]+$/, "") || "audio";
   const extension = /\.([^.]+)$/.exec(file.name)?.[1]?.toUpperCase() ?? "AUDIO";
@@ -72,7 +66,7 @@ async function decodeAt8k(data: ArrayBuffer): Promise<AudioBuffer> {
   let context: OfflineAudioContext;
   try {
     // decodeAudioData remuestrea a la frecuencia del contexto que decodifica.
-    context = new OfflineAudioContext(1, 1, ALTUR_SAMPLE_RATE);
+    context = new OfflineAudioContext(1, 1, API_SAMPLE_RATE);
   } catch {
     return resampleAudioBuffer(await decode(new OfflineAudioContext(1, 1, 48_000), data));
   }
@@ -92,13 +86,13 @@ async function decode(context: BaseAudioContext, data: ArrayBuffer): Promise<Aud
  * e interpolación lineal. Es más tosco que el remuestreador nativo, pero solo se usa si ese falla.
  */
 function resampleAudioBuffer(input: AudioBuffer): AudioBuffer {
-  const ratio = input.sampleRate / ALTUR_SAMPLE_RATE;
+  const ratio = input.sampleRate / API_SAMPLE_RATE;
   const length = Math.floor(input.length / ratio);
   const window = Math.max(1, Math.round(ratio));
   const output = new AudioBuffer({
     length,
     numberOfChannels: input.numberOfChannels,
-    sampleRate: ALTUR_SAMPLE_RATE,
+    sampleRate: API_SAMPLE_RATE,
   });
   for (let channel = 0; channel < input.numberOfChannels; channel++) {
     const source = input.getChannelData(channel);

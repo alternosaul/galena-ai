@@ -52,10 +52,10 @@ import { UploadError, postWithProgress, type UploadPhase } from "@/lib/upload";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import {
-  ALTUR_CHANNELS,
-  ALTUR_SAMPLE_RATE,
+  API_CHANNELS,
+  API_SAMPLE_RATE,
   MAX_REQUEST_BYTES,
-  alturWavIssues,
+  apiWavIssues,
   base64ToBytes,
   bytesToBase64,
   clientChannelWav,
@@ -133,7 +133,7 @@ async function uploadFileFor(file: File, detectorId: string): Promise<File> {
   if (findDetector(detectorId)?.stereo_only !== false) return file;
   const bytes = new Uint8Array(await file.arrayBuffer());
   const info = parseWavHeader(bytes);
-  if (!info || info.channels !== ALTUR_CHANNELS || info.bitsPerSample !== 16) return file;
+  if (!info || info.channels !== API_CHANNELS || info.bitsPerSample !== 16) return file;
   return new File([clientChannelWav(bytes, info)], file.name, { type: "audio/wav" });
 }
 
@@ -222,8 +222,8 @@ function DetectorPage() {
   const payload = {
     call_id: callId.trim() || DEFAULT_CALL_ID,
     audio_base64: cleanBase64,
-    sample_rate: ALTUR_SAMPLE_RATE,
-    channels: ALTUR_CHANNELS,
+    sample_rate: API_SAMPLE_RATE,
+    channels: API_CHANNELS,
   };
   const payloadPreview = JSON.stringify(
     {
@@ -246,7 +246,7 @@ function DetectorPage() {
       toast.error(t("toast.invalidBase64"));
       return;
     }
-    const issues = alturWavIssues(parseWavHeader(bytes));
+    const issues = apiWavIssues(parseWavHeader(bytes));
     if (issues.length > 0) {
       toast.error(issues.map((issue) => wavIssueText(t, issue)).join(" · "));
       return;
@@ -285,7 +285,7 @@ function DetectorPage() {
       const normalized = await normalizeAudio(next);
       const head = new Uint8Array(await normalized.file.slice(0, 1024 * 1024).arrayBuffer());
       const info = parseWavHeader(head);
-      const issues = alturWavIssues(info);
+      const issues = apiWavIssues(info);
       if (normalized.file.size > MAX_AUDIO_BYTES) {
         issues.push({ code: "tooLarge", value: Number(LIMIT_MB) });
       }
@@ -312,7 +312,7 @@ function DetectorPage() {
         return;
       }
       const head = new Uint8Array(await normalized.file.slice(0, 1024 * 1024).arrayBuffer());
-      const issues = alturWavIssues(parseWavHeader(head));
+      const issues = apiWavIssues(parseWavHeader(head));
       if (issues.length > 0) {
         toast.error(issues.map((issue) => wavIssueText(t, issue)).join(" · "));
         return;

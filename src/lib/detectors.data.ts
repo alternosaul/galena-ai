@@ -1,4 +1,5 @@
-import type { ConfusionCounts, ModelEvaluation, ModelInfo } from "./detection";
+import type { ConfusionCounts, EvaluationSubset, ModelEvaluation, ModelInfo } from "./detection";
+import report from "./evaluations.generated.json";
 
 /**
  * Catálogo de los detectores públicos: los 3 con nombre de montaña (Everest, Fuji, Mont Blanc), de
@@ -6,53 +7,41 @@ import type { ConfusionCounts, ModelEvaluation, ModelInfo } from "./detection";
  * Los experimentales (galena-full, galena-client-only, acoustic-baseline) no se ofrecen en el sitio
  * ni en su API.
  *
- * Orden y nombres de montaña: ranking general de MODELS_FINAL_COMPARISON.md (promedio de AUC y
- * balanced accuracy en llamadas Altur y AlternativeData). Métricas: reports/final_models/summary.csv,
- * siempre en datos no vistos por el modelo:
- *   - Llamadas Altur val: 71 llamadas (37 humanas, 34 IA).
- *   - AlternativeData test: 20,122 clips, con generadores (xtts-v1, fish-speech) y speakers nuevos.
+ * Métricas y curvas: evaluations.generated.json, generado con
+ * galena-live/scripts/evaluate_mountain_models.py --fresh. Cada modelo ONNX servido (los mismos
+ * archivos de services/model-api/final_models) se ejecutó sobre los 20,122 clips de AlternativeData
+ * test (18,606 IA, 1,516 humanos), extrayendo las features desde el audio. Ningún modelo usó ese
+ * split para entrenar; incluye generadores (xtts-v1, fish-speech) y speakers que no vieron.
  * Es la fuente del catálogo: la demo no usa base de datos.
  */
 
-const EVALUATED_AT = "2026-09-13T00:00:00Z";
+type ReportModel = keyof typeof report.models;
 
-type EvaluationValues = Pick<
-  ModelEvaluation,
-  | "threshold"
-  | "confusion"
-  | "accuracy"
-  | "balanced_accuracy"
-  | "precision"
-  | "f1"
-  | "auc"
-  | "brier"
-  | "train_only_reference"
->;
-
-/** Matriz en el orden del reporte: TN · FP · FN · TP (positivo = IA). */
-function cm(tn: number, fp: number, fn: number, tp: number): ConfusionCounts {
-  return { true_human: tn, false_ai: fp, false_human: fn, true_ai: tp };
-}
-
-function callsVal(values: EvaluationValues): ModelEvaluation {
-  return {
-    dataset: "Altur",
-    split: "val",
-    evaluated_at: EVALUATED_AT,
-    sample_count: 71,
-    latency_p95_ms: null,
-    ...values,
-  };
-}
-
-function clipsTest(values: EvaluationValues): ModelEvaluation {
+/** Evaluación real de un modelo en AlternativeData test, leída del reporte generado. */
+function clipsTest(id: ReportModel): ModelEvaluation {
+  const r = report.models[id];
   return {
     dataset: "AlternativeData",
     split: "test",
-    evaluated_at: EVALUATED_AT,
-    sample_count: 20_122,
+    evaluated_at: report.evaluated_at,
+    sample_count: r.n,
+    threshold: r.threshold,
+    confusion: r.confusion as ConfusionCounts,
+    accuracy: r.accuracy,
+    balanced_accuracy: r.balanced_accuracy,
+    precision: r.precision,
+    recall: r.recall,
+    f1: r.f1,
+    auc: r.auc,
+    average_precision: r.average_precision,
+    brier: r.brier,
+    eer: r.eer,
     latency_p95_ms: null,
-    ...values,
+    roc: r.roc as [number, number][],
+    pr: r.pr as [number, number][],
+    scores: r.scores,
+    subsets: r.subsets as ModelEvaluation["subsets"] satisfies Record<EvaluationSubset, unknown>,
+    generators: r.generators,
   };
 }
 
@@ -84,41 +73,18 @@ export const DETECTORS: Omit<ModelInfo, "available">[] = [
       en: "154 Galena client_only features: MFCCs and deltas, spectrum, pitch and level of the client's voice, speech frames only (VAD)",
     },
     description: {
-      es: "El mejor modelo en conjunto. Casi perfecto en llamadas Altur y el que mejor generaliza a voces y generadores nuevos: AUC 0.903 en AlternativeData y 0.863 en generadores no vistos, con 5 % de falsos positivos.",
-      en: "The best model overall. Near-perfect on Altur calls and the best at generalizing to new voices and generators: AUC 0.903 on AlternativeData and 0.863 on unseen generators, with 5% false positives.",
+      es: "El mejor modelo en conjunto y el que mejor generaliza: AUC 0.903 en los 20,122 clips de prueba, 0.942 con speakers nuevos y 0.863 con generadores nuevos, marcando como IA solo al 5.2 % de los humanos. Su punto débil es fish-speech (16 %).",
+      en: "The best model overall and the one that generalizes best: AUC 0.903 on the 20,122 test clips, 0.942 on new speakers and 0.863 on new generators, flagging only 5.2% of humans as AI. Its weak spot is fish-speech (16%).",
     },
     trained_on: {
-      es: "Llamadas Altur (train + val) y AlternativeData (train + val)",
-      en: "Altur calls (train + val) and AlternativeData (train + val)",
+      es: "Llamadas de voz (train + val) y AlternativeData (train + val)",
+      en: "Voice calls (train + val) and AlternativeData (train + val)",
     },
     status: "active",
-    threshold: 0.5916,
+    threshold: report.models.everest.threshold,
     is_default: true,
     stereo_only: false,
-    evaluations: [
-      callsVal({
-        threshold: 0.5868,
-        train_only_reference: true,
-        confusion: cm(37, 0, 3, 31),
-        accuracy: 0.9577,
-        balanced_accuracy: 0.9559,
-        precision: 1,
-        f1: 0.9538,
-        auc: 1,
-        brier: 0.0187,
-      }),
-      clipsTest({
-        threshold: 0.5916,
-        train_only_reference: false,
-        confusion: cm(1437, 79, 6565, 12041),
-        accuracy: 0.6698,
-        balanced_accuracy: 0.7975,
-        precision: 0.9935,
-        f1: 0.7838,
-        auc: 0.9033,
-        brier: 0.2258,
-      }),
-    ],
+    evaluations: [clipsTest("everest")],
   },
   {
     id: "fuji",
@@ -131,41 +97,18 @@ export const DETECTORS: Omit<ModelInfo, "available">[] = [
     algorithm: GB_CALIBRATED,
     features: ACOUSTIC_FEATURES,
     description: {
-      es: "Segundo mejor en conjunto y el más conservador con humanos: solo 4 % de falsos positivos en AlternativeData. Es ligero y no usa VAD, aunque deja pasar más voces de IA que Everest.",
-      en: "Second best overall and the most conservative with humans: only 4% false positives on AlternativeData. Lightweight and VAD-free, though it lets more AI voices through than Everest.",
+      es: "El más conservador con humanos: solo 4.0 % de falsos positivos en los clips de prueba. Es ligero y no usa VAD, pero deja pasar el 60.7 % de las voces de IA (AUC 0.781).",
+      en: "The most conservative with humans: only 4.0% false positives on the test clips. Lightweight and VAD-free, but it lets 60.7% of AI voices through (AUC 0.781).",
     },
     trained_on: {
-      es: "Llamadas Altur (train) y AlternativeData (train)",
-      en: "Altur calls (train) and AlternativeData (train)",
+      es: "Llamadas de voz (train) y AlternativeData (train)",
+      en: "Voice calls (train) and AlternativeData (train)",
     },
     status: "active",
     threshold: 0.7,
     is_default: false,
     stereo_only: false,
-    evaluations: [
-      callsVal({
-        threshold: 0.7,
-        train_only_reference: false,
-        confusion: cm(37, 0, 6, 28),
-        accuracy: 0.9155,
-        balanced_accuracy: 0.9118,
-        precision: 1,
-        f1: 0.9032,
-        auc: 0.9984,
-        brier: 0.042,
-      }),
-      clipsTest({
-        threshold: 0.7,
-        train_only_reference: false,
-        confusion: cm(1456, 60, 11287, 7319),
-        accuracy: 0.4361,
-        balanced_accuracy: 0.6769,
-        precision: 0.9919,
-        f1: 0.5633,
-        auc: 0.7805,
-        brier: 0.27,
-      }),
-    ],
+    evaluations: [clipsTest("fuji")],
   },
   {
     id: "montblanc",
@@ -178,8 +121,8 @@ export const DETECTORS: Omit<ModelInfo, "available">[] = [
     algorithm: GB_CALIBRATED,
     features: ACOUSTIC_FEATURES,
     description: {
-      es: "Entrenado solo con clips de AlternativeData. Es el que más detecta generadores difíciles (fish-speech 41.9 %) y el mejor calibrado en clips, pero marca como IA a cerca del 27 % de los humanos y en llamadas baja a AUC 0.760.",
-      en: "Trained only on AlternativeData clips. It catches the most hard generators (fish-speech 41.9%) and is the best calibrated on clips, but flags about 27% of humans as AI and drops to AUC 0.760 on calls.",
+      es: "Entrenado solo con clips de AlternativeData. Es el que más detecta generadores difíciles (fish-speech 41.9 %, xtts-v1 94.8 %) y el mejor calibrado (Brier 0.091), pero marca como IA al 27.0 % de los humanos (AUC 0.822).",
+      en: "Trained only on AlternativeData clips. It catches the most hard generators (fish-speech 41.9%, xtts-v1 94.8%) and is the best calibrated (Brier 0.091), but flags 27.0% of humans as AI (AUC 0.822).",
     },
     trained_on: {
       es: "AlternativeData train (subconjunto de speakers)",
@@ -189,30 +132,7 @@ export const DETECTORS: Omit<ModelInfo, "available">[] = [
     threshold: 0.7,
     is_default: false,
     stereo_only: false,
-    evaluations: [
-      callsVal({
-        threshold: 0.7,
-        train_only_reference: false,
-        confusion: cm(26, 11, 9, 25),
-        accuracy: 0.7183,
-        balanced_accuracy: 0.719,
-        precision: 0.6944,
-        f1: 0.7143,
-        auc: 0.7599,
-        brier: 0.2481,
-      }),
-      clipsTest({
-        threshold: 0.7,
-        train_only_reference: false,
-        confusion: cm(1107, 409, 4600, 14006),
-        accuracy: 0.7511,
-        balanced_accuracy: 0.7415,
-        precision: 0.9716,
-        f1: 0.8483,
-        auc: 0.8218,
-        brier: 0.0912,
-      }),
-    ],
+    evaluations: [clipsTest("montblanc")],
   },
 ];
 

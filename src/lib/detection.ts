@@ -49,13 +49,37 @@ export type ConfusionCounts = {
   false_human: number;
 };
 
-/** Conjuntos de evaluación (datos no vistos por cada modelo). */
-export type ModelDataset = "Altur" | "AlternativeData";
+/** Conjunto de evaluación: AlternativeData test, que ningún modelo usó para entrenar. */
+export type ModelDataset = "AlternativeData";
 
-/** Evaluación de un detector (métricas del catálogo en detectors.data.ts). */
+/** Subconjuntos del test para medir generalización. */
+export type EvaluationSubset = "all" | "seen_generators" | "unseen_generators" | "unseen_speakers";
+
+export type SubsetMetrics = {
+  n: number;
+  auc: number | null;
+  balanced_accuracy: number | null;
+  false_positive_rate: number | null;
+  false_negative_rate: number | null;
+};
+
+export type GeneratorMetrics = {
+  /** Origen del clip; "natural" son las voces humanas. */
+  generator: string;
+  n: number;
+  synthetic: boolean;
+  /** Clips clasificados correctamente con el umbral del modelo. */
+  correct_rate: number;
+  seen_in_training: boolean;
+};
+
+/**
+ * Evaluación de un detector, calculada con sus predicciones reales sobre cada clip
+ * (galena-live/scripts/evaluate_mountain_models.py → evaluations.generated.json).
+ */
 export type ModelEvaluation = {
   dataset: ModelDataset;
-  split: "train" | "val" | "test" | "alternate";
+  split: "test";
   evaluated_at: string;
   sample_count: number;
   threshold: number;
@@ -63,12 +87,22 @@ export type ModelEvaluation = {
   accuracy: number | null;
   balanced_accuracy: number | null;
   precision: number | null;
+  recall: number | null;
   f1: number | null;
   auc: number | null;
+  average_precision: number | null;
   brier: number | null;
+  /** Tasa de error igual (FPR = FNR). */
+  eer: number | null;
   latency_p95_ms: number | null;
-  /** Métrica del modelo entrenado solo con train (la versión final se reentrenó con train + val). */
-  train_only_reference: boolean;
+  /** Curva ROC real: pares [FPR, TPR]. */
+  roc: [number, number][];
+  /** Curva precisión-recall real (precisión interpolada): pares [recall, precisión]. */
+  pr: [number, number][];
+  /** Histograma de P(sintético) por clase real; `bins` son los bordes (uno más que los conteos). */
+  scores: { bins: number[]; human: number[]; ai: number[] };
+  subsets: Record<EvaluationSubset, SubsetMetrics>;
+  generators: GeneratorMetrics[];
 };
 
 /** Detector de la API de modelos. */
@@ -98,12 +132,15 @@ export type ModelInfo = {
 
 export type ModelsResponse = { mode: "live" | "simulated"; models: ModelInfo[] };
 
-export function evaluationFor(model: ModelInfo, dataset: ModelDataset): ModelEvaluation | null {
+export function evaluationFor(
+  model: ModelInfo,
+  dataset: ModelDataset = "AlternativeData",
+): ModelEvaluation | null {
   return model.evaluations.find((e) => e.dataset === dataset) ?? null;
 }
 
 /**
- * Ejemplo de referencia (llamada real call_5e4539a471f6 del reto Altur). El audio (~4 MB en
+ * Ejemplo de referencia (llamada real call_5e4539a471f6). El audio (~4 MB en
  * base64) se recorta a su cabecera WAV: sirve para mostrar el formato, no para enviarse.
  */
 export const EXAMPLE_PAYLOAD = JSON.stringify(

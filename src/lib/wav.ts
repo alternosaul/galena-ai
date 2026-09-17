@@ -7,8 +7,8 @@
  * de hasta 300 segundos. Canal 0 = interlocutor, canal 1 = agente.
  */
 
-export const ALTUR_SAMPLE_RATE = 8000;
-export const ALTUR_CHANNELS = 2;
+export const API_SAMPLE_RATE = 8000;
+export const API_CHANNELS = 2;
 export const MAX_DURATION_SEC = 300;
 
 /**
@@ -78,14 +78,14 @@ export function parseWavHeader(bytes: Uint8Array): WavInfo | null {
  * Diferencias entre el WAV y el contrato de la API (lista vacía = válido). Con `allowMono`, también
  * acepta el canal del cliente solo (ver clientChannelWav).
  */
-export function alturWavIssues(info: WavInfo | null, allowMono = false): WavIssue[] {
+export function apiWavIssues(info: WavInfo | null, allowMono = false): WavIssue[] {
   if (!info) return [{ code: "invalid" }];
   const issues: WavIssue[] = [];
   const pcm = info.audioFormat === WAVE_FORMAT_PCM || info.audioFormat === WAVE_FORMAT_EXTENSIBLE;
   if (!pcm || info.bitsPerSample !== 16) issues.push({ code: "format" });
-  if (info.sampleRate !== ALTUR_SAMPLE_RATE)
+  if (info.sampleRate !== API_SAMPLE_RATE)
     issues.push({ code: "sampleRate", value: info.sampleRate });
-  if (info.channels !== ALTUR_CHANNELS && !(allowMono && info.channels === 1))
+  if (info.channels !== API_CHANNELS && !(allowMono && info.channels === 1))
     issues.push({ code: "channels", value: info.channels });
   if (info.dataBytes === 0) issues.push({ code: "empty" });
   else if (info.durationSec > MAX_DURATION_SEC) {
@@ -211,8 +211,8 @@ export function encodePcm16Wav(
 
 /** WAV estéreo de 8 kHz en silencio, en base64 (payload de ejemplo que la API acepta). */
 export function silentWavBase64(durationSec = 0.02): string {
-  const frames = Math.round(ALTUR_SAMPLE_RATE * durationSec);
-  const blockAlign = ALTUR_CHANNELS * 2;
+  const frames = Math.round(API_SAMPLE_RATE * durationSec);
+  const blockAlign = API_CHANNELS * 2;
   const dataBytes = frames * blockAlign;
   const view = new DataView(new ArrayBuffer(44 + dataBytes));
   writeFourCC(view, 0, "RIFF");
@@ -221,9 +221,9 @@ export function silentWavBase64(durationSec = 0.02): string {
   writeFourCC(view, 12, "fmt ");
   view.setUint32(16, 16, true);
   view.setUint16(20, WAVE_FORMAT_PCM, true);
-  view.setUint16(22, ALTUR_CHANNELS, true);
-  view.setUint32(24, ALTUR_SAMPLE_RATE, true);
-  view.setUint32(28, ALTUR_SAMPLE_RATE * blockAlign, true);
+  view.setUint16(22, API_CHANNELS, true);
+  view.setUint32(24, API_SAMPLE_RATE, true);
+  view.setUint32(28, API_SAMPLE_RATE * blockAlign, true);
   view.setUint16(32, blockAlign, true);
   view.setUint16(34, 16, true);
   writeFourCC(view, 36, "data");

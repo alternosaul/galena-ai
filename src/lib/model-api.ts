@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { DetectionResult } from "./detection";
 import { DEFAULT_DETECTOR_ID, DETECTORS, findDetector } from "./detectors.data";
-import { alturWavIssues, describeWavIssue, parseWavHeader } from "./wav";
+import { apiWavIssues, describeWavIssue, parseWavHeader } from "./wav";
 
 /**
  * Cliente de la API de modelos (services/model-api: 6 detectores ONNX). Solo se usa desde las
@@ -104,7 +104,7 @@ export async function runDetection(input: DetectionInput): Promise<DetectionResu
   // El sitio sube solo el canal del cliente (mono) a los detectores que no miden turnos; el JSON
   // público mantiene el contrato estéreo.
   const allowMono = input.inputType === "audio_upload" && !detector.stereo_only;
-  const issues = alturWavIssues(info, allowMono);
+  const issues = apiWavIssues(info, allowMono);
   if (!info || issues.length > 0) {
     throw new DetectionError(issues.map(describeWavIssue).join("; "), 400);
   }

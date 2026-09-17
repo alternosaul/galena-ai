@@ -1,9 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Check } from "lucide-react";
+import report from "@/lib/evaluations.generated.json";
 
 import { BrandLogo } from "@/components/brand-logo";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+const everest = report.models.everest;
 
 /** Alturas fijas (no aleatorias) para que SSR y cliente coincidan. */
 const EQ_BARS = [
@@ -117,10 +120,13 @@ export function LoginHero() {
             <Enter delay={350}>
               <GlassCard>
                 <dl className="flex h-full flex-col justify-between gap-3">
-                  {/* Everest en datos no vistos (MODELS_FINAL_COMPARISON.md). */}
-                  <Stat label="AUC · Altur" value="1.000" />
-                  <Stat label="AUC · AltData" value="0.903" />
-                  <Stat label={t("metric.fpr")} value="5.2%" />
+                  {/* Everest en los 20,122 clips de prueba (evaluations.generated.json). */}
+                  <Stat label="AUC · Test" value={everest.auc.toFixed(3)} />
+                  <Stat label="EER" value={`${(everest.eer * 100).toFixed(1)}%`} />
+                  <Stat
+                    label={t("metric.fpr")}
+                    value={`${(everest.false_positive_rate * 100).toFixed(1)}%`}
+                  />
                 </dl>
               </GlassCard>
             </Enter>

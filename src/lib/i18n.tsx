@@ -195,8 +195,8 @@ const es = {
   // Modelo
   "model.title": "Modelo",
   "model.subtitle": "Rendimiento y características de los modelos disponibles.",
-  "model.placeholderNote":
-    "Métricas reales en datos no vistos (MODELS_FINAL_COMPARISON.md). ROC, PR y distribución se aproximan a partir del AUC y los conteos reales.",
+  "model.dataNote":
+    "Métricas y curvas reales: cada modelo se ejecutó sobre los 20,122 clips de prueba de AlternativeData (18,606 IA, 1,516 humanos), que ninguno usó para entrenar.",
   "model.trainedOn": "Entrenado con",
   "status.active": "Activo",
   "status.beta": "Beta",
@@ -225,9 +225,11 @@ const es = {
   "chart.pr": "Curva Precisión-Recall",
   "chart.prDesc": "Compromiso entre precisión y recall para la clase IA.",
   "chart.confusion": "Matriz de confusión",
-  "chart.confusionDesc": "Predicciones vs. etiquetas reales en el set de validación.",
+  "chart.confusionDesc":
+    "Predicciones con el umbral del modelo vs. etiquetas reales en el set de prueba.",
+  "chart.operatingPoint": "Umbral",
   "chart.scores": "Distribución de puntajes",
-  "chart.scoresDesc": "Cómo se reparten los puntajes de síntesis por clase real.",
+  "chart.scoresDesc": "P(sintético) de cada clip por clase real, en % de su clase.",
   "chart.history": "Evolución de evaluaciones",
   "chart.historyDesc": "Métrica seleccionada por modelo en cada evaluación.",
   "chart.compare": "Comparación de modelos",
@@ -365,9 +367,6 @@ const es = {
   "detector.recommended": "Recomendados",
   "model.recommended": "Recomendados · ranking general",
   "model.experimentalBadge": "Experimental",
-  "model.dataset": "Dataset",
-  "model.datasetCalls": "Llamadas Altur · val",
-  "model.datasetClips": "AlternativeData · test",
   "model.family": "Familia",
   "model.family.galena": "Galena (MFCC + VAD)",
   "model.family.acoustic": "Acoustic (acoustic-v1-8k)",
@@ -376,15 +375,22 @@ const es = {
   "model.stereoOnly": "Solo llamada estéreo",
   "model.notApplicable":
     "No aplica: este modelo necesita la llamada estéreo con los turnos del agente y no se evaluó en clips.",
-  "model.trainOnlyNote":
-    "Métrica del modelo entrenado solo con train (umbral {threshold}); la versión servida se reentrenó con train + val.",
   "metric.fpr": "Falsos positivos",
   "metric.fpr.desc": "Porcentaje de humanos marcados como IA. Menor es mejor.",
   "metric.fnr": "Falsos negativos",
   "metric.fnr.desc": "Porcentaje de voces de IA que pasan como humanas. Menor es mejor.",
-  "chart.generalization": "Generalización entre datasets",
+  "chart.generalization": "Generalización",
   "chart.generalizationDesc":
-    "Cada modelo en llamadas Altur frente a AlternativeData, siempre en datos no vistos.",
+    "AUC o exactitud balanceada en el test completo y en los clips con speakers o generadores que el modelo no vio al entrenar.",
+  "chart.generators": "Detección por generador",
+  "chart.generatorsDesc":
+    "Clips clasificados correctamente con el umbral de cada modelo, por origen del audio.",
+  "chart.generatorsNote": "* Generador que ningún modelo vio al entrenar. {n} clips en total.",
+  "chart.humanVoices": "Voces humanas",
+  "subset.all": "Test completo",
+  "subset.seenGenerators": "Generadores vistos",
+  "subset.unseenSpeakers": "Speakers nuevos",
+  "subset.unseenGenerators": "Generadores nuevos",
 
   // API de modelos (galena-live)
   "field.detector": "Detector",
@@ -597,8 +603,8 @@ const en: Record<TKey, string> = {
 
   "model.title": "Model",
   "model.subtitle": "Performance and characteristics of the available models.",
-  "model.placeholderNote":
-    "Real metrics on unseen data (MODELS_FINAL_COMPARISON.md). ROC, PR and score distribution are approximated from the AUC and the real counts.",
+  "model.dataNote":
+    "Real metrics and curves: every model was run on the 20,122 AlternativeData test clips (18,606 AI, 1,516 human), which none of them used for training.",
   "model.trainedOn": "Trained on",
   "status.active": "Active",
   "status.beta": "Beta",
@@ -626,9 +632,10 @@ const en: Record<TKey, string> = {
   "chart.pr": "Precision-Recall curve",
   "chart.prDesc": "Trade-off between precision and recall for the AI class.",
   "chart.confusion": "Confusion matrix",
-  "chart.confusionDesc": "Predictions vs. true labels on the validation set.",
+  "chart.confusionDesc": "Predictions at the model threshold vs. true labels on the test set.",
+  "chart.operatingPoint": "Threshold",
   "chart.scores": "Score distribution",
-  "chart.scoresDesc": "How synthesis scores spread across each true class.",
+  "chart.scoresDesc": "P(synthetic) of every clip by true class, as % of its class.",
   "chart.history": "Evaluation trend",
   "chart.historyDesc": "Selected metric per model at each evaluation.",
   "chart.compare": "Model comparison",
@@ -762,9 +769,6 @@ const en: Record<TKey, string> = {
   "detector.recommended": "Recommended",
   "model.recommended": "Recommended · overall ranking",
   "model.experimentalBadge": "Experimental",
-  "model.dataset": "Dataset",
-  "model.datasetCalls": "Altur calls · val",
-  "model.datasetClips": "AlternativeData · test",
   "model.family": "Family",
   "model.family.galena": "Galena (MFCC + VAD)",
   "model.family.acoustic": "Acoustic (acoustic-v1-8k)",
@@ -773,15 +777,21 @@ const en: Record<TKey, string> = {
   "model.stereoOnly": "Stereo calls only",
   "model.notApplicable":
     "Not applicable: this model needs the stereo call with the agent's turns and was not evaluated on clips.",
-  "model.trainOnlyNote":
-    "Metric from the model trained on train only (threshold {threshold}); the served version was retrained on train + val.",
   "metric.fpr": "False positives",
   "metric.fpr.desc": "Share of humans flagged as AI. Lower is better.",
   "metric.fnr": "False negatives",
   "metric.fnr.desc": "Share of AI voices that pass as human. Lower is better.",
-  "chart.generalization": "Cross-dataset generalization",
+  "chart.generalization": "Generalization",
   "chart.generalizationDesc":
-    "Each model on Altur calls versus AlternativeData, always on unseen data.",
+    "AUC or balanced accuracy on the full test set and on clips with speakers or generators the model never saw in training.",
+  "chart.generators": "Detection by generator",
+  "chart.generatorsDesc": "Clips classified correctly at each model's threshold, by audio source.",
+  "chart.generatorsNote": "* Generator no model saw in training. {n} clips in total.",
+  "chart.humanVoices": "Human voices",
+  "subset.all": "Full test",
+  "subset.seenGenerators": "Seen generators",
+  "subset.unseenSpeakers": "New speakers",
+  "subset.unseenGenerators": "New generators",
 
   "field.detector": "Detector",
   "field.threshold": "Threshold",
