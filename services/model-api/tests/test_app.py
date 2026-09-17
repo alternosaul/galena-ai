@@ -131,3 +131,12 @@ def test_unknown_detector_in_env_fails_startup(monkeypatch):
     with pytest.raises(ValueError, match="k2"):
         with TestClient(app):
             pass
+
+
+def test_call_longer_than_max_seconds_is_400(client, monkeypatch):
+    import app as app_module
+
+    monkeypatch.setattr(app_module, "MAX_SECONDS", 2)
+    response = client.post("/detect?detector=fuji", json=body(wav_base64(seconds=3.0)))
+    assert response.status_code == 400
+    assert "2 segundos" in response.json()["error"]

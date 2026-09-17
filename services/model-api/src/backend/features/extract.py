@@ -92,6 +92,42 @@ def _dynamics(turns: list[dict], masks: dict, duration_s: float, hop_s: float) -
     return out
 
 
+# ~10 s of frames per librosa.yin call (hop 80 at 8 kHz).
+YIN_CHUNK_FRAMES = 1000
+
+
+def _yin_chunked(
+    y: np.ndarray,
+    *,
+    fmin: float,
+    fmax: float,
+    sr: int,
+    frame_length: int,
+    hop_length: int,
+    chunk_frames: int = YIN_CHUNK_FRAMES,
+) -> np.ndarray:
+    """librosa.yin(center=True) computed in chunks of frames: the same F0 track with bounded memory.
+
+    YIN treats every frame independently (difference function, cumulative mean normalization,
+    parabolic interpolation and trough threshold), so framing the centered signal in pieces and
+    concatenating gives the same result. On a whole call, librosa.yin allocates complex FFTs for all
+    frames at once: ~375 MB for 137 s of audio, enough to exhaust a 512 MB instance.
+    """
+    pad = frame_length // 2
+    padded = np.pad(y, (pad, pad), mode="constant")
+    n_frames = 1 + (len(padded) - frame_length) // hop_length
+    parts = []
+    for start in range(0, n_frames, chunk_frames):
+        stop = min(start + chunk_frames, n_frames)
+        segment = padded[start * hop_length : (stop - 1) * hop_length + frame_length]
+        parts.append(
+            librosa.yin(
+                segment, fmin=fmin, fmax=fmax, sr=sr, frame_length=frame_length, hop_length=hop_length, center=False
+            )
+        )
+    return np.concatenate(parts)
+
+
 def _client_acoustics(
     y: np.ndarray, sr: int, speech: np.ndarray, rms_db: np.ndarray, altur_speech: np.ndarray | None = None
 ) -> dict:
@@ -133,7 +169,7 @@ def _client_acoustics(
     out["sp_energy_above_2500hz"] = float(band_power[freqs >= 2500].sum() / total)
 
     # Prosody: F0 track on client speech frames.
-    f0 = librosa.yin(y, fmin=F0_MIN, fmax=F0_MAX, sr=sr, frame_length=512, hop_length=HOP_LENGTH)[:n]
+    f0 = _yin_chunked(y, fmin=F0_MIN, fmax=F0_MAX, sr=sr, frame_length=512, hop_length=HOP_LENGTH)[:n]
     voiced = sel & (f0 > F0_MIN * 1.05) & (f0 < F0_MAX * 0.95)
     f0_v = f0[voiced]
     _stats(out, "pr_f0", f0_v, ("mean", "median", "std", "p10", "p90", "cv"))

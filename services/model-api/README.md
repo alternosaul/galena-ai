@@ -16,9 +16,15 @@ El orden sigue el ranking general de `MODELS_FINAL_COMPARISON.md` (promedio en l
 
 ## Procedencia
 
-`final_models/` y `src/backend/` se copiaron **sin cambios** (SHA-256 idénticos) de
-`lamunuwa/galena-live`, rama `feat/synthetic-voice-detection-models`, commit `307b538`. Solo `app.py`
-es propio de este servicio. Para actualizar los modelos, vuelve a copiar esos archivos.
+`final_models/` y `src/backend/` se copiaron de `lamunuwa/galena-live`, rama
+`feat/synthetic-voice-detection-models`, commit `307b538`. `app.py` es propio de este servicio.
+
+Único cambio sobre la copia: `src/backend/features/extract.py` calcula `librosa.yin` por chunks de
+~10 s (`_yin_chunked`). Sobre la llamada completa, `librosa.yin` reservaba FFTs complejas de todos los
+frames a la vez (~375 MB para 137 s) y agotaba la instancia de 512 MB. YIN procesa cada frame por
+separado, así que el F0, todas las features y las predicciones son idénticos bit a bit (verificado en
+llamadas de 0.4 s a 216 s y en `tests/test_features.py`). Si vuelves a copiar `extract.py`, conserva
+ese cambio.
 
 ## Contrato
 
@@ -74,9 +80,15 @@ función de Vercel se corta a los 300 s. Dos configuraciones funcionan:
    `GALENA_DEFAULT_DETECTOR=fuji` (también en Vercel). Aun despertando, la primera detección llega
    en ~1.5 min. El sitio solo ofrece los detectores que la API reporta como cargados.
 
+Memoria con el límite de 512 MB, usando los valores por defecto del `Dockerfile`: pico de 411 MB con
+los 6 detectores cargados (llamadas de 96 a 150 s, dos solicitudes simultáneas y 30 detecciones
+seguidas), y la memoria vuelve a ~272 MB tras cada detección. El `Dockerfile` fija para instancias
+pequeñas `GALENA_INFERENCE_SLOTS=1`, `GALENA_MAX_SECONDS=150` y `MALLOC_*` (que numpy devuelva la
+memoria al liberarla); una llamada de 290 s con detectores Galena no cabe en 512 MB.
+
 Notas de operación:
 
-- Con poca CPU conviene `GALENA_INFERENCE_SLOTS=1`.
+- Con una sola plaza de inferencia, una segunda solicitud simultánea recibe 503 ("Servidor ocupado").
 - Los detectores que no se carguen responden 400, y `GALENA_DEFAULT_DETECTOR` debe estar entre los
   cargados.
 - No lleva CORS a propósito: solo la habla el servidor del sitio vía `MODEL_API_URL`, nunca el
@@ -93,4 +105,5 @@ GALENA_TEST_CALL=/ruta/call.wav .venv/bin/python -m pytest tests   # incluye una
 ```
 
 Variables: `GALENA_DEFAULT_DETECTOR` (por defecto `everest`), `GALENA_DETECTORS` (todos),
-`GALENA_WARMUP` (`1`; `0` omite el calentamiento), `GALENA_MODELS_DIR`, `GALENA_INFERENCE_SLOTS` (2).
+`GALENA_WARMUP` (`1`; `0` omite el calentamiento), `GALENA_MODELS_DIR`, `GALENA_INFERENCE_SLOTS` (2),
+`GALENA_MAX_SECONDS` (300). El `Dockerfile` cambia algunos de estos valores por defecto (ver Despliegue).

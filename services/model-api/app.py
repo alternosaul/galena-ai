@@ -11,8 +11,9 @@ Respuesta de /detect: `p_synthetic` es P(voz sintética) y `is_synthetic = p_syn
 humana), que es como la interpreta el juez (scripts/check_endpoint.py).
 
 Sirve los 6 detectores ONNX de `final_models/`. Los extractores de features y los modelos se
-copiaron sin cambios de lamunuwa/galena-live (rama feat/synthetic-voice-detection-models,
-commit 307b538). Cada familia usa su propio extractor y la inferencia reproduce
+copiaron de lamunuwa/galena-live (rama feat/synthetic-voice-detection-models, commit 307b538).
+Único cambio: extract.py calcula librosa.yin por chunks para acotar la memoria, con resultados
+idénticos. Cada familia usa su propio extractor y la inferencia reproduce
 scripts/evaluate_final_models.py::predict de esa rama.
 """
 
@@ -49,7 +50,8 @@ ROOT = Path(__file__).resolve().parent
 MODELS_DIR = Path(os.environ.get("GALENA_MODELS_DIR", ROOT / "final_models"))
 DEFAULT_DETECTOR = os.environ.get("GALENA_DEFAULT_DETECTOR", "everest")
 INFERENCE_SLOTS = int(os.environ.get("GALENA_INFERENCE_SLOTS", "2"))
-MAX_SECONDS = 300
+# Límite de duración por llamada. En instancias de 512 MB, las llamadas largas no caben en memoria.
+MAX_SECONDS = int(os.environ.get("GALENA_MAX_SECONDS", "300"))
 
 
 @dataclass(frozen=True)
