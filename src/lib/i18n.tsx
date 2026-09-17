@@ -68,6 +68,8 @@ const es = {
   "toast.invalidJson": "El JSON no es válido",
   "toast.analysisError": "No se pudo analizar la llamada",
   "toast.networkError": "Error de red al contactar el modelo",
+  "toast.uploadStalled": "La subida del audio se detuvo. Revisa tu conexión e inténtalo de nuevo",
+  "toast.timeout": "El modelo tardó demasiado en responder. Inténtalo de nuevo en un momento",
   "toast.selectFile": "Selecciona un archivo de audio",
   "toast.success": "Análisis completado",
   "toast.base64Ready": "Audio convertido a Base64",
@@ -82,6 +84,7 @@ const es = {
   "detector.noteColdStart":
     "La primera solicitud puede tardar unos minutos: el servidor del modelo se apaga cuando no se usa y necesita prepararse. Las siguientes son más rápidas.",
   "detector.loadingHint": "Analizando… si el servidor estaba inactivo, puede tardar unos minutos.",
+  "detector.uploadingHint": "Subiendo audio… {percent}%",
   "detector.toBase64": "Convertir a Base64",
   "detector.convertWav": "Convertir audio a Base64",
   "detector.callId": "ID de la llamada",
@@ -452,6 +455,8 @@ const en: Record<TKey, string> = {
   "toast.invalidJson": "The JSON is not valid",
   "toast.analysisError": "The call could not be analyzed",
   "toast.networkError": "Network error while contacting the model",
+  "toast.uploadStalled": "The audio upload stalled. Check your connection and try again",
+  "toast.timeout": "The model took too long to respond. Try again in a moment",
   "toast.selectFile": "Select an audio file",
   "toast.success": "Analysis complete",
   "toast.base64Ready": "Audio converted to Base64",
@@ -466,6 +471,7 @@ const en: Record<TKey, string> = {
   "detector.noteColdStart":
     "The first request can take a few minutes: the model server shuts down when idle and needs to start up. Later requests are faster.",
   "detector.loadingHint": "Analyzing… if the server was idle, this can take a few minutes.",
+  "detector.uploadingHint": "Uploading audio… {percent}%",
   "detector.toBase64": "Convert to Base64",
   "detector.convertWav": "Convert audio to Base64",
   "detector.callId": "Call ID",

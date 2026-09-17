@@ -42,11 +42,12 @@ import { hasStoredApiSettings, loadApiSettings } from "@/lib/api-settings";
 import { useAuth } from "@/lib/auth";
 import { withBase } from "@/lib/base-path";
 import type { DetectionResult } from "@/lib/detection";
-import { DEFAULT_DETECTOR_ID } from "@/lib/detectors.data";
+import { DEFAULT_DETECTOR_ID, findDetector } from "@/lib/detectors.data";
 import { normalizeAudio, type AudioSource } from "@/lib/audio-normalize";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { modelsQueryOptions } from "@/lib/models-query";
 import { useAddToHistory } from "@/lib/history";
+import { UploadError, postWithProgress, type UploadPhase } from "@/lib/upload";
 import { cn } from "@/lib/utils";
 import {
   ALTUR_CHANNELS,
@@ -55,6 +56,7 @@ import {
   alturWavIssues,
   base64ToBytes,
   bytesToBase64,
+  clientChannelWav,
   parseWavHeader,
   type WavInfo,
   type WavIssue,
@@ -120,6 +122,19 @@ const megabytes = (bytes: number) => (bytes / 1_000_000).toFixed(2);
 /** Acepta WAV y cualquier audio que el navegador pueda decodificar; se convierte antes de enviarse. */
 const AUDIO_ACCEPT = "audio/*,.wav,.mp3,.m4a,.aac,.ogg,.oga,.opus,.flac,.webm";
 
+/**
+ * Archivo que se sube: solo el canal del cliente (mono) salvo para detectores que miden turnos
+ * (stereo_only). Esos detectores solo leen el canal 0, así que el resultado es el mismo con la mitad
+ * de bytes.
+ */
+async function uploadFileFor(file: File, detectorId: string): Promise<File> {
+  if (findDetector(detectorId)?.stereo_only !== false) return file;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const info = parseWavHeader(bytes);
+  if (!info || info.channels !== ALTUR_CHANNELS || info.bitsPerSample !== 16) return file;
+  return new File([clientChannelWav(bytes, info)], file.name, { type: "audio/wav" });
+}
+
 function DetectorPage() {
   const { t } = useI18n();
   const { user } = useAuth();
@@ -137,6 +152,7 @@ function DetectorPage() {
   const [fileIssues, setFileIssues] = useState<WavIssue[]>([]);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase | null>(null);
   const [result, setResult] = useState<DetectionResult | null>(null);
 
   const { data: models } = useQuery(modelsQueryOptions);
@@ -185,6 +201,19 @@ function DetectorPage() {
     toast.success(t("toast.success"));
   }
 
+  function requestErrorToast(error: unknown) {
+    const reason = error instanceof UploadError ? error.reason : "network";
+    toast.error(
+      t(
+        reason === "stalled"
+          ? "toast.uploadStalled"
+          : reason === "timeout"
+            ? "toast.timeout"
+            : "toast.networkError",
+      ),
+    );
+  }
+
   // Solo se pide el audio en Base64; el resto del contrato de la API se completa aquí.
   const cleanBase64 = base64.replace(/\s+/g, "");
   const payload = {
@@ -227,19 +256,17 @@ function DetectorPage() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch(
+      const res = await postWithProgress(
         withBase(`/api/public/detect?detector=${encodeURIComponent(model)}`),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-        },
+        body,
+        { headers: { "Content-Type": "application/json" }, onProgress: setUploadPhase },
       );
       await handleResponse(res);
-    } catch {
-      toast.error(t("toast.networkError"));
+    } catch (error) {
+      requestErrorToast(error);
     } finally {
       setLoading(false);
+      setUploadPhase(null);
     }
   }
 
@@ -347,23 +374,22 @@ function DetectorPage() {
       return;
     }
     if (fileInvalid) return;
-    const form = new FormData();
-    form.append("file", file);
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch(
+      const form = new FormData();
+      form.append("file", await uploadFileFor(file, model));
+      const res = await postWithProgress(
         withBase(`/api/public/detect/audio?detector=${encodeURIComponent(model)}`),
-        {
-          method: "POST",
-          body: form,
-        },
+        form,
+        { onProgress: setUploadPhase },
       );
       await handleResponse(res);
-    } catch {
-      toast.error(t("toast.networkError"));
+    } catch (error) {
+      requestErrorToast(error);
     } finally {
       setLoading(false);
+      setUploadPhase(null);
     }
   }
 
@@ -719,7 +745,9 @@ function DetectorPage() {
             {loading && (
               <p className="flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {t("detector.loadingHint")}
+                {uploadPhase?.phase === "uploading"
+                  ? t("detector.uploadingHint", { percent: uploadPhase.percent })
+                  : t("detector.loadingHint")}
               </p>
             )}
 

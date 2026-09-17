@@ -101,7 +101,10 @@ export async function runDetection(input: DetectionInput): Promise<DetectionResu
   if (!detector) throw new DetectionError(`Detector desconocido: ${input.detector}`, 400);
 
   const info = parseWavHeader(input.wavBytes);
-  const issues = alturWavIssues(info);
+  // El sitio sube solo el canal del cliente (mono) a los detectores que no miden turnos; el JSON
+  // público mantiene el contrato estéreo.
+  const allowMono = input.inputType === "audio_upload" && !detector.stereo_only;
+  const issues = alturWavIssues(info, allowMono);
   if (!info || issues.length > 0) {
     throw new DetectionError(issues.map(describeWavIssue).join("; "), 400);
   }
@@ -110,7 +113,7 @@ export async function runDetection(input: DetectionInput): Promise<DetectionResu
   const receivedAt = new Date().toISOString();
   const base = modelApiBaseUrl();
   const prediction = base
-    ? await callModelApi(base, input, detector.id)
+    ? await callModelApi(base, input, detector.id, info.channels)
     : await simulatePrediction(input, detector.id, detector.threshold);
 
   return {
@@ -132,7 +135,12 @@ export async function runDetection(input: DetectionInput): Promise<DetectionResu
   };
 }
 
-async function callModelApi(base: string, input: DetectionInput, detectorId: string) {
+async function callModelApi(
+  base: string,
+  input: DetectionInput,
+  detectorId: string,
+  channels: number,
+) {
   let res: Response;
   try {
     res = await fetch(`${base}/detect?detector=${encodeURIComponent(detectorId)}`, {
@@ -142,7 +150,7 @@ async function callModelApi(base: string, input: DetectionInput, detectorId: str
         call_id: input.callId,
         audio_base64: input.audioBase64,
         sample_rate: 8000,
-        channels: 2,
+        channels,
       }),
       signal: AbortSignal.timeout(detectionTimeoutMs()),
     });

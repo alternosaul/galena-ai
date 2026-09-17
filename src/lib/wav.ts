@@ -27,6 +27,8 @@ export type WavInfo = {
   sampleRate: number;
   bitsPerSample: number;
   dataBytes: number;
+  /** Posición del primer byte de muestras dentro del archivo. */
+  dataOffset: number;
   durationSec: number;
 };
 
@@ -46,7 +48,7 @@ export function parseWavHeader(bytes: Uint8Array): WavInfo | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (fourCC(view, 0) !== "RIFF" || fourCC(view, 8) !== "WAVE") return null;
 
-  let format: Omit<WavInfo, "dataBytes" | "durationSec"> | null = null;
+  let format: Omit<WavInfo, "dataBytes" | "dataOffset" | "durationSec"> | null = null;
   let offset = 12;
   while (offset + 8 <= bytes.length) {
     const id = fourCC(view, offset);
@@ -65,22 +67,26 @@ export function parseWavHeader(bytes: Uint8Array): WavInfo | null {
       const bytesPerFrame = (format.channels * format.bitsPerSample) / 8;
       const durationSec =
         bytesPerFrame > 0 && format.sampleRate > 0 ? size / bytesPerFrame / format.sampleRate : 0;
-      return { ...format, dataBytes: size, durationSec };
+      return { ...format, dataBytes: size, dataOffset: body, durationSec };
     }
     offset = body + size + (size % 2);
   }
   return null;
 }
 
-/** Diferencias entre el WAV y el contrato de la API (lista vacía = válido). */
-export function alturWavIssues(info: WavInfo | null): WavIssue[] {
+/**
+ * Diferencias entre el WAV y el contrato de la API (lista vacía = válido). Con `allowMono`, también
+ * acepta el canal del cliente solo (ver clientChannelWav).
+ */
+export function alturWavIssues(info: WavInfo | null, allowMono = false): WavIssue[] {
   if (!info) return [{ code: "invalid" }];
   const issues: WavIssue[] = [];
   const pcm = info.audioFormat === WAVE_FORMAT_PCM || info.audioFormat === WAVE_FORMAT_EXTENSIBLE;
   if (!pcm || info.bitsPerSample !== 16) issues.push({ code: "format" });
   if (info.sampleRate !== ALTUR_SAMPLE_RATE)
     issues.push({ code: "sampleRate", value: info.sampleRate });
-  if (info.channels !== ALTUR_CHANNELS) issues.push({ code: "channels", value: info.channels });
+  if (info.channels !== ALTUR_CHANNELS && !(allowMono && info.channels === 1))
+    issues.push({ code: "channels", value: info.channels });
   if (info.dataBytes === 0) issues.push({ code: "empty" });
   else if (info.durationSec > MAX_DURATION_SEC) {
     issues.push({ code: "duration", value: Math.round(info.durationSec) });
@@ -130,6 +136,39 @@ export function base64ToBytes(base64: string): Uint8Array | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * WAV mono con solo el canal 0 (cliente) de un WAV estéreo PCM de 16 bits, copiando las muestras
+ * sin decodificarlas. Los detectores que no son stereo_only solo leen ese canal, así que dan el mismo
+ * resultado con la mitad de bytes: importa en conexiones con subida lenta.
+ */
+export function clientChannelWav(bytes: Uint8Array, info: WavInfo): Uint8Array<ArrayBuffer> {
+  const frames = Math.floor(
+    Math.min(info.dataBytes, bytes.length - info.dataOffset) / (info.channels * 2),
+  );
+  const out = new Uint8Array(44 + frames * 2);
+  const view = new DataView(out.buffer);
+  writeFourCC(view, 0, "RIFF");
+  view.setUint32(4, 36 + frames * 2, true);
+  writeFourCC(view, 8, "WAVE");
+  writeFourCC(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, WAVE_FORMAT_PCM, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, info.sampleRate, true);
+  view.setUint32(28, info.sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeFourCC(view, 36, "data");
+  view.setUint32(40, frames * 2, true);
+  const stride = info.channels * 2;
+  for (let frame = 0; frame < frames; frame++) {
+    const source = info.dataOffset + frame * stride;
+    out[44 + frame * 2] = bytes[source] ?? 0;
+    out[45 + frame * 2] = bytes[source + 1] ?? 0;
+  }
+  return out;
 }
 
 /**
