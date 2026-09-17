@@ -79,10 +79,9 @@ const es = {
   "toast.invalidBase64": "El texto no es Base64 válido",
   "toast.tooLarge": "La solicitud pesa {value} MB y el límite es {limit} MB",
   "toast.convertError": "No se pudo convertir el archivo",
-  "detector.noteWav":
-    "Acepta WAV y cualquier otro formato que tu navegador pueda leer (MP3, M4A, OGG…). Si el audio no es WAV estéreo de 8 kHz y 16 bits, se convierte en el navegador antes de enviarse. Límite: ~2 min de audio al subir el archivo y ~1.5 min en Base64.",
+  "detector.noteWav": "WAV, MP3, M4A, OGG… se convierte solo. Máximo ~2 min.",
   "detector.noteColdStart":
-    "La primera solicitud puede tardar unos minutos: el servidor del modelo se apaga cuando no se usa y necesita prepararse. Las siguientes son más rápidas.",
+    "La primera vez puede tardar unos minutos mientras el servidor despierta.",
   "detector.loadingHint": "Analizando… si el servidor estaba inactivo, puede tardar unos minutos.",
   "detector.uploadingHint": "Subiendo audio… {percent}%",
   "detector.toBase64": "Convertir a Base64",
@@ -464,10 +463,8 @@ const en: Record<TKey, string> = {
   "toast.invalidBase64": "The text is not valid Base64",
   "toast.tooLarge": "The request is {value} MB and the limit is {limit} MB",
   "toast.convertError": "The file could not be converted",
-  "detector.noteWav":
-    "Accepts WAV and any other format your browser can read (MP3, M4A, OGG…). Audio that isn't 8 kHz 16-bit stereo WAV is converted in the browser before it's sent. Limit: ~2 min of audio when uploading the file and ~1.5 min as Base64.",
-  "detector.noteColdStart":
-    "The first request can take a few minutes: the model server shuts down when idle and needs to start up. Later requests are faster.",
+  "detector.noteWav": "WAV, MP3, M4A, OGG… converted automatically. Up to ~2 min.",
+  "detector.noteColdStart": "The first run can take a few minutes while the server wakes up.",
   "detector.loadingHint": "Analyzing… if the server was idle, this can take a few minutes.",
   "detector.uploadingHint": "Uploading audio… {percent}%",
   "detector.toBase64": "Convert to Base64",

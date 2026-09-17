@@ -457,6 +457,33 @@ function DetectorPage() {
               </TabsList>
 
               <TabsContent value="audio" className="space-y-3">
+                <div className="space-y-2 rounded-md border border-dashed border-border p-3 transition-colors hover:border-primary/50 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-500">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {t("detector.previewAudio")}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <audio
+                      controls
+                      preload="none"
+                      src={withBase(PREVIEW_AUDIO)}
+                      className="h-9 min-w-0 flex-1"
+                    />
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => void loadPreviewAudio()}
+                      disabled={loadingPreview || normalizing}
+                    >
+                      {loadingPreview ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="mr-2 h-4 w-4" />
+                      )}
+                      {t("detector.useExample")}
+                    </Button>
+                  </div>
+                </div>
+
                 <label
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -465,11 +492,16 @@ function DetectorPage() {
                   onDragLeave={() => setDragging(false)}
                   onDrop={onDrop}
                   className={cn(
-                    "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-secondary/40 px-6 py-12 text-center transition-colors hover:border-primary",
-                    dragging && "border-primary bg-primary/10",
+                    "group flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-secondary/40 px-6 py-12 text-center transition-all duration-300 hover:border-primary hover:bg-primary/5 hover:shadow-md motion-safe:animate-in motion-safe:fade-in motion-safe:duration-500",
+                    dragging && "border-primary bg-primary/10 motion-safe:scale-[1.02]",
                   )}
                 >
-                  <Upload className="h-6 w-6 text-primary" />
+                  <Upload
+                    className={cn(
+                      "h-6 w-6 text-primary transition-transform duration-300 motion-safe:group-hover:-translate-y-1 motion-safe:group-hover:scale-110",
+                      dragging && "motion-safe:animate-bounce",
+                    )}
+                  />
                   <span className="text-sm font-medium">
                     {file ? file.name : t("detector.dropFile")}
                   </span>
@@ -482,13 +514,13 @@ function DetectorPage() {
                   />
                 </label>
 
-                <ul className="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
-                  <li className="flex gap-2">
-                    <FileAudio className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <ul className="space-y-1.5 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  <li className="flex items-center gap-2">
+                    <FileAudio className="h-3.5 w-3.5 shrink-0 text-primary" />
                     {t("detector.noteWav")}
                   </li>
-                  <li className="flex gap-2">
-                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <li className="flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5 shrink-0 text-primary" />
                     {t("detector.noteColdStart")}
                   </li>
                 </ul>
@@ -500,7 +532,7 @@ function DetectorPage() {
                   </p>
                 )}
                 {file && fileInvalid && (
-                  <ul className="space-y-1 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  <ul className="space-y-1 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1">
                     {fileIssues.map((issue) => (
                       <li key={issue.code} className="flex items-center gap-2">
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -510,7 +542,7 @@ function DetectorPage() {
                   </ul>
                 )}
                 {file && !fileInvalid && fileInfo && (
-                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1">
                     <FileAudio className="h-3.5 w-3.5 text-success" />
                     {t("detector.wavInfo", {
                       rate: fileInfo.sampleRate,
@@ -526,35 +558,6 @@ function DetectorPage() {
                     })}
                     {conversion.channels === 1 && ` ${t("detector.monoNote")}`}
                   </p>
-                )}
-
-                {!file && !normalizing && (
-                  <div className="space-y-2 rounded-md border border-dashed border-border p-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("detector.previewAudio")}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <audio
-                        controls
-                        preload="none"
-                        src={withBase(PREVIEW_AUDIO)}
-                        className="h-9 min-w-0 flex-1"
-                      />
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => void loadPreviewAudio()}
-                        disabled={loadingPreview}
-                      >
-                        {loadingPreview ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Upload className="mr-2 h-4 w-4" />
-                        )}
-                        {t("detector.useExample")}
-                      </Button>
-                    </div>
-                  </div>
                 )}
 
                 <div className="flex flex-wrap gap-2">
@@ -726,7 +729,12 @@ function DetectorPage() {
             )}
           </CardHeader>
           <CardContent className="space-y-6">
-            <ResultBadge state={state} />
+            <div
+              key={`${state}-${shown?.detection_id ?? shown?.call_id ?? ""}`}
+              className="motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-500"
+            >
+              <ResultBadge state={state} />
+            </div>
             <div className={cn(state === "loading" && "animate-pulse")}>
               <ConfidenceGauge value={shown?.confidence ?? 0} loading={!shown} />
             </div>
