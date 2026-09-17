@@ -141,18 +141,36 @@ class DetectResponse(BaseModel):
     threshold: float
 
 
+def enabled_detector_ids() -> list[str]:
+    """Detectores a cargar: GALENA_DETECTORS (ids separados por coma) o todos si está vacía."""
+    raw = os.environ.get("GALENA_DETECTORS", "").strip()
+    if not raw:
+        return list(DETECTORS)
+    ids = [detector_id.strip() for detector_id in raw.split(",") if detector_id.strip()]
+    unknown = [detector_id for detector_id in ids if detector_id not in DETECTORS]
+    if unknown:
+        raise ValueError(f"GALENA_DETECTORS tiene ids desconocidos {unknown}; válidos: {list(DETECTORS)}")
+    return ids
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if DEFAULT_DETECTOR not in DETECTORS:
-        raise ValueError(f"GALENA_DEFAULT_DETECTOR debe ser uno de {list(DETECTORS)}")
-    detectors = {detector_id: LoadedDetector(detector_id, spec) for detector_id, spec in DETECTORS.items()}
+    ids = enabled_detector_ids()
+    if DEFAULT_DETECTOR not in ids:
+        raise ValueError(f"GALENA_DEFAULT_DETECTOR debe ser uno de los detectores cargados {ids}")
+    detectors = {detector_id: LoadedDetector(detector_id, DETECTORS[detector_id]) for detector_id in ids}
 
-    # Calienta librosa/numba y ONNX Runtime para que la primera petición real no sea lenta.
+    # Calentar librosa/numba y ONNX Runtime hace rápida la primera petición real, pero en una CPU
+    # pequeña alarga mucho el arranque. GALENA_WARMUP=0 lo omite: la primera detección de cada
+    # familia paga la compilación de numba.
+    warmup = os.environ.get("GALENA_WARMUP", "1") != "0"
     rng = np.random.default_rng(0)
     warm = (rng.standard_normal((SAMPLE_RATE * 3, 2)) * 0.05).astype(np.float32)
     for detector in detectors.values():
-        detector.predict(warm, SAMPLE_RATE)
+        if warmup:
+            detector.predict(warm, SAMPLE_RATE)
         logger.info("Detector cargado: %s (%s, umbral %.3f)", detector.id, detector.spec.file, detector.threshold)
+    logger.info("Calentamiento %s", "hecho" if warmup else "omitido (GALENA_WARMUP=0)")
 
     app.state.detectors = detectors
     app.state.slots = threading.BoundedSemaphore(INFERENCE_SLOTS)

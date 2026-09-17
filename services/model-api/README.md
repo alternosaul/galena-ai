@@ -47,24 +47,38 @@ docker build -t galena-model-api .
 docker run --rm -p 8000:8000 -e PORT=8000 galena-model-api
 ```
 
-Pensado para **Hugging Face Spaces** (capa gratuita, SDK Docker), que expone el 7860. El Space
-necesita este frontmatter al inicio del README de *su* repo:
+La demo pública corre en **Render** (plan Free, runtime Docker, Root Directory `services/model-api`).
+Hugging Face Spaces ya no ofrece Docker en su hardware gratuito.
 
-```yaml
----
-title: Galena Model API
-sdk: docker
-app_port: 7860
----
-```
+Medido localmente con los límites que se asumen para Render Free (512 MB, 0.1 CPU), con una llamada
+de 100 s:
+
+| Configuración | Arranque | 1.ª detección | Siguientes | Memoria |
+|---|---|---|---|---|
+| 6 detectores, con calentamiento | ~246 s | ~20 s | ~9–20 s | ~284 MB |
+| 6 detectores, `GALENA_WARMUP=0` | ~27 s | ~213 s (Everest) | ~9–20 s | ~210 MB |
+| Solo acústicos (`fuji,montblanc,acoustic-baseline`) | ~25 s | ~5 s | ~4 s | ~130 MB |
+
+El costo de los detectores Galena (Everest, Galena Full, Galena Client-only) es numba compilando
+las funciones vectorizadas de librosa al importarlas, en cada arranque del proceso: la caché en disco
+de numba no lo evitó. `GALENA_WARMUP=0` solo lo mueve del arranque a la primera detección.
+
+Render Free apaga el servicio tras 15 min sin tráfico y tarda ~1 min en volver a encenderlo, y una
+función de Vercel se corta a los 300 s. Dos configuraciones funcionan:
+
+1. **Los 6 detectores, siempre despiertos.** Calentamiento activado (por defecto) y un monitor externo
+   gratuito (p. ej. UptimeRobot) que haga `GET /health` cada 10 min para que Render no lo apague.
+   Un servicio 24/7 usa ~744 de las 750 horas gratuitas al mes. El arranque de ~4 min solo ocurre
+   tras un deploy o reinicio.
+2. **Solo acústicos, sin monitor.** `GALENA_DETECTORS=fuji,montblanc,acoustic-baseline` y
+   `GALENA_DEFAULT_DETECTOR=fuji` (también en Vercel). Aun despertando, la primera detección llega
+   en ~1.5 min. El sitio solo ofrece los detectores que la API reporta como cargados.
 
 Notas de operación:
 
-- El `lifespan` carga los 6 detectores y calienta librosa/numba antes de aceptar tráfico, así que
-  el arranque en frío tarda decenas de segundos. En un Space gratuito que se duerme por inactividad,
-  la primera petición después de despertar paga ese costo.
-- Cargar los 6 detectores no cabe con holgura en plataformas de 512 MB de RAM (Render free).
-  Para ajustarse, reduce `DETECTORS` en `app.py` o sube el plan.
+- Con poca CPU conviene `GALENA_INFERENCE_SLOTS=1`.
+- Los detectores que no se carguen responden 400, y `GALENA_DEFAULT_DETECTOR` debe estar entre los
+  cargados.
 - No lleva CORS a propósito: solo la habla el servidor del sitio vía `MODEL_API_URL`, nunca el
   navegador. Si algún día se expone al navegador, hay que añadir `CORSMiddleware`.
 
@@ -78,4 +92,5 @@ GALENA_TEST_CALL=/ruta/call.wav .venv/bin/python -m pytest tests   # incluye una
 .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-Variables: `GALENA_DEFAULT_DETECTOR` (por defecto `everest`), `GALENA_MODELS_DIR`, `GALENA_INFERENCE_SLOTS` (2).
+Variables: `GALENA_DEFAULT_DETECTOR` (por defecto `everest`), `GALENA_DETECTORS` (todos),
+`GALENA_WARMUP` (`1`; `0` omite el calentamiento), `GALENA_MODELS_DIR`, `GALENA_INFERENCE_SLOTS` (2).

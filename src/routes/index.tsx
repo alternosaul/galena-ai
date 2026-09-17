@@ -4,9 +4,12 @@ import { useEffect, useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
 import {
   AlertTriangle,
+  Clock,
+  Copy,
   FileAudio,
   FileJson,
   FlaskConical,
+  Loader2,
   Mountain,
   Play,
   Upload,
@@ -14,6 +17,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,13 +38,23 @@ import { ResultBadge, VerdictPill } from "@/components/result-badge";
 import { hasStoredApiSettings, loadApiSettings } from "@/lib/api-settings";
 import { useAuth } from "@/lib/auth";
 import { withBase } from "@/lib/base-path";
-import { EXAMPLE_PAYLOAD, type DetectionResult } from "@/lib/detection";
+import type { DetectionResult } from "@/lib/detection";
 import { DEFAULT_DETECTOR_ID } from "@/lib/detectors.data";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { modelsQueryOptions } from "@/lib/models-query";
 import { useAddToHistory } from "@/lib/history";
 import { cn } from "@/lib/utils";
-import { alturWavIssues, parseWavHeader, type WavInfo, type WavIssue } from "@/lib/wav";
+import {
+  ALTUR_CHANNELS,
+  ALTUR_SAMPLE_RATE,
+  MAX_REQUEST_BYTES,
+  alturWavIssues,
+  base64ToBytes,
+  bytesToBase64,
+  parseWavHeader,
+  type WavInfo,
+  type WavIssue,
+} from "@/lib/wav";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -62,12 +76,23 @@ export const Route = createFileRoute("/")({
 });
 
 type ErrorBody = { error?: string; detail?: { field: string; message: string }[] };
+type InputTab = "audio" | "base64";
+
+const DEFAULT_CALL_ID = "call_demo_001";
+const LIMIT_MB = (MAX_REQUEST_BYTES / 1_000_000).toFixed(1);
+/** Margen para la cabecera multipart al subir el archivo. */
+const MAX_AUDIO_BYTES = MAX_REQUEST_BYTES - 2_000;
+
+const megabytes = (bytes: number) => (bytes / 1_000_000).toFixed(2);
 
 function DetectorPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const [model, setModel] = useState(DEFAULT_DETECTOR_ID);
-  const [json, setJson] = useState("");
+  const [tab, setTab] = useState<InputTab>("audio");
+  const [callId, setCallId] = useState(DEFAULT_CALL_ID);
+  const [base64, setBase64] = useState("");
+  const [converting, setConverting] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [fileInfo, setFileInfo] = useState<WavInfo | null>(null);
   const [fileIssues, setFileIssues] = useState<WavIssue[]>([]);
@@ -76,6 +101,11 @@ function DetectorPage() {
   const [result, setResult] = useState<DetectionResult | null>(null);
 
   const { data: models } = useQuery(modelsQueryOptions);
+  // Si la API de modelos reporta qué detectores cargó (GALENA_DETECTORS), solo se ofrecen esos. Si
+  // no respondió (p. ej. mientras el servidor despierta), se muestran todos.
+  const offered = models?.some((m) => m.available === true)
+    ? models.filter((m) => m.available !== false)
+    : models;
   const addToHistory = useAddToHistory();
 
   useEffect(() => {
@@ -93,10 +123,10 @@ function DetectorPage() {
 
   // Si la preferencia guardada apunta a un detector inexistente, usa el predeterminado.
   useEffect(() => {
-    if (models && models.length > 0 && !models.some((m) => m.id === model)) {
-      setModel(models.find((m) => m.is_default)?.id ?? DEFAULT_DETECTOR_ID);
+    if (offered && offered.length > 0 && !offered.some((m) => m.id === model)) {
+      setModel(offered.find((m) => m.is_default)?.id ?? offered[0]?.id ?? DEFAULT_DETECTOR_ID);
     }
-  }, [models, model]);
+  }, [offered, model]);
 
   const detectorName = (id: string) => models?.find((m) => m.id === id)?.name ?? id;
   const fileInvalid = fileIssues.length > 0;
@@ -116,12 +146,43 @@ function DetectorPage() {
     toast.success(t("toast.success"));
   }
 
-  async function analyzeJson() {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(json);
-    } catch {
-      toast.error(t("toast.invalidJson"));
+  // Solo se pide el audio en Base64; el resto del contrato de la API se completa aquí.
+  const cleanBase64 = base64.replace(/\s+/g, "");
+  const payload = {
+    call_id: callId.trim() || DEFAULT_CALL_ID,
+    audio_base64: cleanBase64,
+    sample_rate: ALTUR_SAMPLE_RATE,
+    channels: ALTUR_CHANNELS,
+  };
+  const payloadPreview = JSON.stringify(
+    {
+      ...payload,
+      audio_base64: cleanBase64
+        ? `${cleanBase64.slice(0, 40)}… (${cleanBase64.length.toLocaleString()})`
+        : t("detector.payloadPending"),
+    },
+    null,
+    2,
+  );
+
+  async function analyzeBase64() {
+    if (!cleanBase64) {
+      toast.error(t("toast.missingBase64"));
+      return;
+    }
+    const bytes = base64ToBytes(cleanBase64);
+    if (!bytes) {
+      toast.error(t("toast.invalidBase64"));
+      return;
+    }
+    const issues = alturWavIssues(parseWavHeader(bytes));
+    if (issues.length > 0) {
+      toast.error(issues.map((issue) => wavIssueText(t, issue)).join(" · "));
+      return;
+    }
+    const body = JSON.stringify(payload);
+    if (body.length > MAX_REQUEST_BYTES) {
+      toast.error(t("toast.tooLarge", { value: megabytes(body.length), limit: LIMIT_MB }));
       return;
     }
     setLoading(true);
@@ -132,7 +193,7 @@ function DetectorPage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(parsed),
+          body,
         },
       );
       await handleResponse(res);
@@ -152,7 +213,39 @@ function DetectorPage() {
     const head = new Uint8Array(await next.slice(0, 1024 * 1024).arrayBuffer());
     const info = parseWavHeader(head);
     setFileInfo(info);
-    setFileIssues(alturWavIssues(info));
+    const issues = alturWavIssues(info);
+    if (next.size > MAX_AUDIO_BYTES) issues.push({ code: "tooLarge", value: Number(LIMIT_MB) });
+    setFileIssues(issues);
+  }
+
+  /** Convierte un WAV válido a Base64, lo pone en el campo y abre la pestaña de Base64. */
+  async function convertToBase64(source: File) {
+    const head = new Uint8Array(await source.slice(0, 1024 * 1024).arrayBuffer());
+    const issues = alturWavIssues(parseWavHeader(head));
+    if (issues.length > 0) {
+      toast.error(issues.map((issue) => wavIssueText(t, issue)).join(" · "));
+      return;
+    }
+    setConverting(true);
+    try {
+      setBase64(bytesToBase64(new Uint8Array(await source.arrayBuffer())));
+      setCallId(source.name.replace(/\.wav$/i, "") || DEFAULT_CALL_ID);
+      setTab("base64");
+      toast.success(t("toast.base64Ready"));
+    } catch {
+      toast.error(t("toast.convertError"));
+    } finally {
+      setConverting(false);
+    }
+  }
+
+  async function copyBase64() {
+    try {
+      await navigator.clipboard.writeText(cleanBase64);
+      toast.success(t("toast.base64Copied"));
+    } catch {
+      toast.error(t("toast.copyFailed"));
+    }
   }
 
   async function analyzeAudio() {
@@ -208,7 +301,7 @@ function DetectorPage() {
             <SelectContent>
               <SelectGroup>
                 <SelectLabel>{t("detector.recommended")}</SelectLabel>
-                {(models ?? [])
+                {(offered ?? [])
                   .filter((m) => m.rank !== null)
                   .map((m) => (
                     <SelectItem key={m.id} value={m.id}>
@@ -223,7 +316,7 @@ function DetectorPage() {
               <SelectSeparator />
               <SelectGroup>
                 <SelectLabel>{t("detector.experimental")}</SelectLabel>
-                {(models ?? [])
+                {(offered ?? [])
                   .filter((m) => m.rank === null)
                   .map((m) => (
                     <SelectItem key={m.id} value={m.id}>
@@ -242,31 +335,27 @@ function DetectorPage() {
             <CardTitle className="text-base">{t("detector.input")}</CardTitle>
             <CardDescription>{t("detector.inputDesc")}</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="json">
+          <CardContent className="space-y-4">
+            <ul className="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
+              <li className="flex gap-2">
+                <FileAudio className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                {t("detector.noteWav")}
+              </li>
+              <li className="flex gap-2">
+                <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                {t("detector.noteColdStart")}
+              </li>
+            </ul>
+
+            <Tabs value={tab} onValueChange={(value) => setTab(value as InputTab)}>
               <TabsList className="mb-4">
-                <TabsTrigger value="json">
-                  <FileJson className="mr-2 h-4 w-4" /> JSON
-                </TabsTrigger>
                 <TabsTrigger value="audio">
                   <Upload className="mr-2 h-4 w-4" /> Audio
                 </TabsTrigger>
+                <TabsTrigger value="base64">
+                  <FileJson className="mr-2 h-4 w-4" /> JSON · Base64
+                </TabsTrigger>
               </TabsList>
-
-              <TabsContent value="json" className="space-y-3">
-                <Textarea
-                  value={json}
-                  onChange={(e) => setJson(e.target.value)}
-                  placeholder={EXAMPLE_PAYLOAD}
-                  rows={12}
-                  spellCheck={false}
-                  className="font-mono text-xs [overflow-wrap:anywhere]"
-                />
-                <Button onClick={analyzeJson} disabled={loading} className="w-full sm:w-auto">
-                  <Play className="mr-2 h-4 w-4" />
-                  {t("detector.analyzeCall")}
-                </Button>
-              </TabsContent>
 
               <TabsContent value="audio" className="space-y-3">
                 <label
@@ -315,14 +404,116 @@ function DetectorPage() {
                   </p>
                 )}
 
-                <Button
-                  onClick={analyzeAudio}
-                  disabled={loading || !file || fileInvalid}
-                  className="w-full sm:w-auto"
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  {t("detector.analyzeAudio")}
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={analyzeAudio}
+                    disabled={loading || !file || fileInvalid}
+                    className="w-full sm:w-auto"
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    {t("detector.analyzeAudio")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => file && void convertToBase64(file)}
+                    disabled={!file || fileInvalid || converting}
+                    className="w-full sm:w-auto"
+                  >
+                    {converting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileJson className="mr-2 h-4 w-4" />
+                    )}
+                    {t("detector.toBase64")}
+                  </Button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="base64" className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="call-id">{t("detector.callId")}</Label>
+                    <Input
+                      id="call-id"
+                      value={callId}
+                      onChange={(e) => setCallId(e.target.value)}
+                      className="font-mono text-sm"
+                      spellCheck={false}
+                    />
+                  </div>
+                  <Button variant="outline" asChild>
+                    <label
+                      className={cn(
+                        "cursor-pointer",
+                        converting && "pointer-events-none opacity-50",
+                      )}
+                    >
+                      {converting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="mr-2 h-4 w-4" />
+                      )}
+                      {t("detector.convertWav")}
+                      <input
+                        type="file"
+                        accept=".wav,audio/wav,audio/x-wav"
+                        className="hidden"
+                        onChange={(e) => {
+                          const picked = e.target.files?.[0];
+                          e.target.value = "";
+                          if (picked) void convertToBase64(picked);
+                        }}
+                      />
+                    </label>
+                  </Button>
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <Label htmlFor="audio-base64">{t("detector.base64Label")}</Label>
+                    {cleanBase64 && (
+                      <span className="text-xs text-muted-foreground">
+                        {t("detector.base64Size", {
+                          chars: cleanBase64.length.toLocaleString(),
+                          mb: megabytes(cleanBase64.length),
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  <Textarea
+                    id="audio-base64"
+                    value={base64}
+                    onChange={(e) => setBase64(e.target.value)}
+                    placeholder={t("detector.base64Placeholder")}
+                    rows={6}
+                    spellCheck={false}
+                    className="font-mono text-xs [overflow-wrap:anywhere]"
+                  />
+                  <p className="text-xs text-muted-foreground">{t("detector.base64Hint")}</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>{t("detector.payloadPreview")}</Label>
+                  <pre className="max-h-48 overflow-auto rounded-md border border-border bg-muted/40 p-3 font-mono text-xs">
+                    {payloadPreview}
+                  </pre>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={analyzeBase64} disabled={loading} className="w-full sm:w-auto">
+                    <Play className="mr-2 h-4 w-4" />
+                    {t("detector.analyzeCall")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void copyBase64()}
+                    disabled={!cleanBase64}
+                    className="w-full sm:w-auto"
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    {t("detector.copyBase64")}
+                  </Button>
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -352,6 +543,12 @@ function DetectorPage() {
             <div className={cn(state === "loading" && "animate-pulse")}>
               <ConfidenceGauge value={result?.confidence ?? 0} loading={!result} />
             </div>
+            {loading && (
+              <p className="flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                {t("detector.loadingHint")}
+              </p>
+            )}
 
             <dl className="space-y-2.5 border-t border-border pt-4 text-sm">
               <Row
@@ -464,6 +661,8 @@ function wavIssueText(
       return t("wav.duration", { value: issue.value });
     case "empty":
       return t("wav.empty");
+    case "tooLarge":
+      return t("wav.tooLarge", { value: issue.value });
   }
 }
 

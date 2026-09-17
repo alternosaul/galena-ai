@@ -11,7 +11,9 @@ import { alturWavIssues, describeWavIssue, parseWavHeader } from "./wav";
  * Variables de entorno (en la VPS: /etc/galena-ai.env):
  *   MODEL_API_URL         URL base, p. ej. http://127.0.0.1:8000.
  *                         Si no está definida, el sitio responde en modo simulado.
- *   MODEL_API_TIMEOUT_MS  Tiempo máximo por detección (por defecto 30000 ms).
+ *   MODEL_API_TIMEOUT_MS  Tiempo máximo por detección (por defecto 280000 ms: si la API de modelos
+ *                         estaba dormida, la primera petición espera a que arranque; queda por
+ *                         debajo del máximo de 300 s de una función de Vercel).
  */
 
 const upstreamDetectionSchema = z.object({
@@ -90,7 +92,7 @@ export function modelApiBaseUrl(): string | null {
 
 function detectionTimeoutMs() {
   const value = Number(process.env["MODEL_API_TIMEOUT_MS"]);
-  return Number.isFinite(value) && value > 0 ? value : 30_000;
+  return Number.isFinite(value) && value > 0 ? value : 280_000;
 }
 
 /** Valida el WAV, llama a la API de modelos (o simula) y arma la respuesta del sitio. */

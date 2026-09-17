@@ -11,6 +11,13 @@ export const ALTUR_SAMPLE_RATE = 8000;
 export const ALTUR_CHANNELS = 2;
 export const MAX_DURATION_SEC = 300;
 
+/**
+ * Vercel rechaza peticiones de más de 4.5 MB a sus funciones (413 FUNCTION_PAYLOAD_TOO_LARGE).
+ * Se deja margen para la cabecera multipart y el resto del JSON: ~2 min de WAV al subir el archivo
+ * (32 KB/s) y ~1.5 min en Base64, que ocupa un tercio más.
+ */
+export const MAX_REQUEST_BYTES = 4_400_000;
+
 const WAVE_FORMAT_PCM = 1;
 const WAVE_FORMAT_EXTENSIBLE = 0xfffe;
 
@@ -29,7 +36,8 @@ export type WavIssue =
   | { code: "sampleRate"; value: number }
   | { code: "channels"; value: number }
   | { code: "duration"; value: number }
-  | { code: "empty" };
+  | { code: "empty" }
+  | { code: "tooLarge"; value: number };
 
 /** Devuelve el formato y la duración del WAV, o null si la cabecera no es válida. */
 export function parseWavHeader(bytes: Uint8Array): WavInfo | null {
@@ -94,6 +102,8 @@ export function describeWavIssue(issue: WavIssue): string {
       return `El WAV excede el límite de ${MAX_DURATION_SEC} segundos (${issue.value} s)`;
     case "empty":
       return "El archivo de audio está vacío";
+    case "tooLarge":
+      return `El archivo supera ${issue.value} MB`;
   }
 }
 
