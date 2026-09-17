@@ -7,6 +7,7 @@ import {
   Bot,
   Clock,
   Copy,
+  Eye,
   FileAudio,
   FileJson,
   FlaskConical,
@@ -93,6 +94,24 @@ const EXAMPLES = [
   },
   { id: "ai", file: "/examples/ejemplo-ia.json", label: "detector.exampleAi", icon: Bot },
 ] as const;
+/**
+ * Vista previa antes de analizar nada: el audio de ejemplo de IA y la respuesta real de Everest con
+ * ese audio (call_5e4539a471f6), medida contra el despliegue.
+ */
+const PREVIEW_AUDIO = "/examples/ejemplo-ia.wav";
+const PREVIEW_RESULT: DetectionResult = {
+  call_id: "call_5e4539a471f6",
+  is_synthetic: true,
+  confidence: 0.9747,
+  p_synthetic: 0.9747,
+  model: "everest",
+  threshold: 0.5916,
+  latency_ms: 5647,
+  received_at: "2026-09-17T00:00:00.000Z",
+  duration_sec: 96.24,
+  sample_rate: 8000,
+  channels: 2,
+};
 const LIMIT_MB = (MAX_REQUEST_BYTES / 1_000_000).toFixed(1);
 /** Margen para la cabecera multipart al subir el archivo. */
 const MAX_AUDIO_BYTES = MAX_REQUEST_BYTES - 2_000;
@@ -109,6 +128,7 @@ function DetectorPage() {
   const [callId, setCallId] = useState(DEFAULT_CALL_ID);
   const [base64, setBase64] = useState("");
   const [converting, setConverting] = useState(false);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const [normalizing, setNormalizing] = useState(false);
   const [conversion, setConversion] = useState<AudioSource | null>(null);
   const [loadingExample, setLoadingExample] = useState<string | null>(null);
@@ -278,6 +298,21 @@ function DetectorPage() {
     }
   }
 
+  /** Carga el audio de ejemplo de la vista previa en la pestaña Audio. */
+  async function loadPreviewAudio() {
+    setLoadingPreview(true);
+    try {
+      const res = await fetch(withBase(PREVIEW_AUDIO));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      await selectFile(new File([blob], `${PREVIEW_RESULT.call_id}.wav`, { type: "audio/wav" }));
+    } catch {
+      toast.error(t("toast.exampleError"));
+    } finally {
+      setLoadingPreview(false);
+    }
+  }
+
   /** Carga un ejemplo de demostración: su audio en Base64 y su call_id. */
   async function loadExample(example: (typeof EXAMPLES)[number]) {
     setLoadingExample(example.id);
@@ -339,7 +374,10 @@ function DetectorPage() {
     if (dropped) void selectFile(dropped);
   }
 
-  const state = loading ? "loading" : result ? (result.is_synthetic ? "ai" : "human") : "idle";
+  // Antes de analizar nada, el panel de resultado muestra la vista previa del ejemplo de IA.
+  const preview = !loading && !result;
+  const shown = result ?? (preview ? PREVIEW_RESULT : null);
+  const state = loading ? "loading" : shown ? (shown.is_synthetic ? "ai" : "human") : "idle";
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -394,17 +432,6 @@ function DetectorPage() {
             <CardDescription>{t("detector.inputDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ul className="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
-              <li className="flex gap-2">
-                <FileAudio className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                {t("detector.noteWav")}
-              </li>
-              <li className="flex gap-2">
-                <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                {t("detector.noteColdStart")}
-              </li>
-            </ul>
-
             <Tabs value={tab} onValueChange={(value) => setTab(value as InputTab)}>
               <TabsList className="mb-4">
                 <TabsTrigger value="audio">
@@ -441,6 +468,17 @@ function DetectorPage() {
                   />
                 </label>
 
+                <ul className="space-y-2 rounded-md border border-border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
+                  <li className="flex gap-2">
+                    <FileAudio className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    {t("detector.noteWav")}
+                  </li>
+                  <li className="flex gap-2">
+                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    {t("detector.noteColdStart")}
+                  </li>
+                </ul>
+
                 {normalizing && (
                   <p className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -474,6 +512,35 @@ function DetectorPage() {
                     })}
                     {conversion.channels === 1 && ` ${t("detector.monoNote")}`}
                   </p>
+                )}
+
+                {!file && !normalizing && (
+                  <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {t("detector.previewAudio")}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <audio
+                        controls
+                        preload="none"
+                        src={withBase(PREVIEW_AUDIO)}
+                        className="h-9 min-w-0 flex-1"
+                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void loadPreviewAudio()}
+                        disabled={loadingPreview}
+                      >
+                        {loadingPreview ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Upload className="mr-2 h-4 w-4" />
+                        )}
+                        {t("detector.useExample")}
+                      </Button>
+                    </div>
+                  </div>
                 )}
 
                 <div className="flex flex-wrap gap-2">
@@ -624,24 +691,30 @@ function DetectorPage() {
             <div className="space-y-1.5">
               <CardTitle className="text-base">{t("detector.result")}</CardTitle>
               <CardDescription>
-                {state === "idle"
-                  ? t("detector.idleHint")
-                  : result?.simulated
+                {preview
+                  ? t("detector.previewDesc")
+                  : shown?.simulated
                     ? t("detector.simulatedHint")
                     : t("detector.resultDesc")}
               </CardDescription>
             </div>
-            {result?.simulated && (
+            {shown?.simulated && (
               <Badge variant="outline" className="shrink-0 gap-1 border-primary/40 text-primary">
                 <FlaskConical className="h-3 w-3" />
                 {t("detector.simulated")}
+              </Badge>
+            )}
+            {preview && (
+              <Badge variant="outline" className="shrink-0 gap-1 border-primary/40 text-primary">
+                <Eye className="h-3 w-3" />
+                {t("detector.previewBadge")}
               </Badge>
             )}
           </CardHeader>
           <CardContent className="space-y-6">
             <ResultBadge state={state} />
             <div className={cn(state === "loading" && "animate-pulse")}>
-              <ConfidenceGauge value={result?.confidence ?? 0} loading={!result} />
+              <ConfidenceGauge value={shown?.confidence ?? 0} loading={!shown} />
             </div>
             {loading && (
               <p className="flex items-center justify-center gap-2 text-center text-xs text-muted-foreground">
@@ -653,30 +726,30 @@ function DetectorPage() {
             <dl className="space-y-2.5 border-t border-border pt-4 text-sm">
               <Row
                 label={t("field.callId")}
-                value={result?.call_id}
+                value={shown?.call_id}
                 placeholder="call_5e4539a471f6"
                 loading={loading}
               />
               <Row
                 label={t("field.detector")}
                 value={
-                  result ? detectorName(result.model) : loading ? undefined : detectorName(model)
+                  shown ? detectorName(shown.model) : loading ? undefined : detectorName(model)
                 }
                 placeholder={detectorName(model)}
                 loading={loading}
               />
               <Row
                 label={t("field.threshold")}
-                value={result?.threshold !== undefined ? result.threshold.toFixed(2) : undefined}
+                value={shown?.threshold !== undefined ? shown.threshold.toFixed(2) : undefined}
                 placeholder="0.70"
                 loading={loading}
               />
               <Row
                 label={t("field.pSynthetic")}
                 value={
-                  result
-                    ? result.p_synthetic !== undefined
-                      ? result.p_synthetic.toFixed(4)
+                  shown
+                    ? shown.p_synthetic !== undefined
+                      ? shown.p_synthetic.toFixed(4)
                       : "—"
                     : undefined
                 }
@@ -686,9 +759,9 @@ function DetectorPage() {
               <Row
                 label={t("field.duration")}
                 value={
-                  result
-                    ? result.duration_sec !== undefined
-                      ? `${result.duration_sec.toFixed(1)} s`
+                  shown
+                    ? shown.duration_sec !== undefined
+                      ? `${shown.duration_sec.toFixed(1)} s`
                       : "—"
                     : undefined
                 }
@@ -698,9 +771,9 @@ function DetectorPage() {
               <Row
                 label={t("field.format")}
                 value={
-                  result
-                    ? result.sample_rate
-                      ? `${result.sample_rate} Hz · ${result.channels} ch`
+                  shown
+                    ? shown.sample_rate
+                      ? `${shown.sample_rate} Hz · ${shown.channels} ch`
                       : "—"
                     : undefined
                 }
@@ -709,13 +782,13 @@ function DetectorPage() {
               />
               <Row
                 label={t("field.latency")}
-                value={result ? `${result.latency_ms} ms` : undefined}
+                value={shown ? `${shown.latency_ms} ms` : undefined}
                 placeholder="000 ms"
                 loading={loading}
               />
               <Row
                 label={t("field.detectionId")}
-                value={result ? (result.detection_id ?? "—") : undefined}
+                value={shown ? (shown.detection_id ?? "—") : undefined}
                 placeholder="—"
                 loading={loading}
               />
@@ -724,12 +797,12 @@ function DetectorPage() {
                 <dd>
                   {loading ? (
                     <Skeleton className="h-5 w-16 rounded-full" />
-                  ) : result ? (
+                  ) : shown ? (
                     <span className="flex items-center gap-2">
                       <code className="text-xs text-muted-foreground">
-                        {String(result.is_synthetic)}
+                        {String(shown.is_synthetic)}
                       </code>
-                      <VerdictPill synthetic={result.is_synthetic} />
+                      <VerdictPill synthetic={shown.is_synthetic} />
                     </span>
                   ) : (
                     <span className="font-mono text-xs text-muted-foreground/60">true | false</span>

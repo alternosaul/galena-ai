@@ -53,7 +53,7 @@ const es = {
 
   // Detector
   "detector.title": "Detector",
-  "detector.subtitle": "Analiza una llamada y determina si la voz es sintética o humana.",
+  "detector.subtitle": "Analiza un audio y determina si la voz es sintética o humana.",
   "detector.model": "Modelo",
   "detector.modelPlaceholder": "Selecciona un modelo",
   "detector.input": "Entrada",
@@ -64,7 +64,7 @@ const es = {
   "detector.fileHint": "WAV, MP3, M4A, OGG… · se convierte a WAV estéreo de 8 kHz · máx. ~2 min",
   "detector.result": "Resultado",
   "detector.resultDesc": "is_synthetic y confianza del modelo.",
-  "detector.idleHint": "Envía una llamada para ver aquí el veredicto y la confianza.",
+  "detector.idleHint": "Envía un audio para ver aquí el veredicto y la confianza.",
   "toast.invalidJson": "El JSON no es válido",
   "toast.analysisError": "No se pudo analizar la llamada",
   "toast.networkError": "Error de red al contactar el modelo",
@@ -93,6 +93,11 @@ const es = {
   "detector.payloadPreview": "JSON que se enviará",
   "detector.payloadPending": "<pega aquí el audio en Base64>",
   "detector.copyBase64": "Copiar Base64",
+  "detector.previewBadge": "Vista previa",
+  "detector.previewDesc":
+    "Ejemplo: resultado real de Everest con un audio de IA. Sube un audio para analizar el tuyo.",
+  "detector.previewAudio": "Audio de ejemplo (IA)",
+  "detector.useExample": "Usar este audio",
   "detector.normalizing": "Convirtiendo el audio a WAV estéreo de 8 kHz…",
   "detector.normalized": "Convertido en el navegador a WAV · 8000 Hz · 2 ch (original: {source}).",
   "detector.monoNote": "Audio mono: va en el canal del cliente y el del agente queda en silencio.",
@@ -431,7 +436,8 @@ const en: Record<TKey, string> = {
   "field.result": "Result",
 
   "detector.title": "Detector",
-  "detector.subtitle": "Analyze a call and find out whether the voice is synthetic or human.",
+  "detector.subtitle":
+    "Analyze an audio clip and find out whether the voice is synthetic or human.",
   "detector.model": "Model",
   "detector.modelPlaceholder": "Select a model",
   "detector.input": "Input",
@@ -442,7 +448,7 @@ const en: Record<TKey, string> = {
   "detector.fileHint": "WAV, MP3, M4A, OGG… · converted to 8 kHz stereo WAV · max. ~2 min",
   "detector.result": "Result",
   "detector.resultDesc": "is_synthetic and model confidence.",
-  "detector.idleHint": "Submit a call to see the verdict and confidence here.",
+  "detector.idleHint": "Submit an audio clip to see the verdict and confidence here.",
   "toast.invalidJson": "The JSON is not valid",
   "toast.analysisError": "The call could not be analyzed",
   "toast.networkError": "Network error while contacting the model",
@@ -471,6 +477,11 @@ const en: Record<TKey, string> = {
   "detector.payloadPreview": "JSON to be sent",
   "detector.payloadPending": "<paste the Base64 audio here>",
   "detector.copyBase64": "Copy Base64",
+  "detector.previewBadge": "Preview",
+  "detector.previewDesc":
+    "Example: real Everest result for an AI audio clip. Upload an audio file to analyze your own.",
+  "detector.previewAudio": "Example audio (AI)",
+  "detector.useExample": "Use this audio",
   "detector.normalizing": "Converting the audio to 8 kHz stereo WAV…",
   "detector.normalized": "Converted in the browser to WAV · 8000 Hz · 2 ch (original: {source}).",
   "detector.monoNote":
