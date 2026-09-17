@@ -7,12 +7,14 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 
-/** Rutas accesibles sin sesión; se muestran sin sidebar ni header. */
+/** Rutas que se muestran sin sidebar ni header. */
 const PUBLIC_PATHS = new Set(["/login"]);
 
 /**
- * Protege las rutas del lado del cliente mientras la autenticación es simulada.
- * TODO(auth): con sesión real en cookie, mover esta verificación a `beforeLoad`.
+ * Demo sin autenticación: se entra directo al dashboard y ninguna ruta exige sesión.
+ * /login sigue existiendo y funcionando; quien inicie sesión recupera su perfil y su historial.
+ * TODO(auth): para volver a protegerlas, redirigir a /login cuando `status` sea "unauthenticated"
+ * (preferiblemente desde `beforeLoad`, con la sesión en cookie).
  */
 export function AppShell() {
   const { status } = useAuth();
@@ -21,12 +23,13 @@ export function AppShell() {
   const isPublic = PUBLIC_PATHS.has(pathname);
 
   useEffect(() => {
-    if (status === "unauthenticated" && !isPublic) void navigate({ to: "/login", replace: true });
+    // Tras iniciar sesión se sale del panel de login; sin sesión no se redirige a ningún lado.
     if (status === "authenticated" && isPublic) void navigate({ to: "/", replace: true });
   }, [status, isPublic, navigate]);
 
   if (isPublic) return <Outlet />;
-  if (status !== "authenticated") return <SplashScreen />;
+  // Solo se espera mientras Supabase resuelve una sesión previa; si no hay, se entra igual.
+  if (status === "loading") return <SplashScreen />;
 
   return (
     <SidebarProvider>

@@ -1,8 +1,9 @@
 import { useCallback } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut, Plug, UserRound } from "lucide-react";
+import { LogIn, LogOut, Plug, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +33,16 @@ export function UserMenu() {
   const { t } = useI18n();
   const logout = useLogout();
 
-  if (!user) return null;
+  // Demo sin sesión: sin este botón el panel de login quedaría sin acceso desde la interfaz.
+  if (!user)
+    return (
+      <Button asChild variant="outline" size="sm">
+        <Link to="/login">
+          <LogIn className="mr-2 h-4 w-4" />
+          {t("login.submit")}
+        </Link>
+      </Button>
+    );
 
   return (
     <DropdownMenu>

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -55,8 +55,18 @@ function ProfilePage() {
   const { t } = useI18n();
   const { user } = useAuth();
 
-  // AppShell solo renderiza esta ruta con sesión activa.
-  if (!user) return null;
+  // Demo sin sesión: el perfil es lo único que necesita cuenta, así que ofrece el panel de login
+  // en vez de quedarse en blanco.
+  if (!user)
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center">
+        <h1 className="text-2xl font-bold tracking-tight">{t("profile.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("login.subtitle")}</p>
+        <Button asChild>
+          <Link to="/login">{t("login.submit")}</Link>
+        </Button>
+      </div>
+    );
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
