@@ -56,3 +56,11 @@ src/
   lib/             i18n, theme, auth, metrics, data helpers
 public/            static assets
 ```
+
+---
+
+## Author
+
+Built by **Saúl Hinojosa** — portfolio: [saulhinojosa.site](https://saulhinojosa.site)
+
+How it was built: [saulhinojosa.site/blog/galena-ai/](https://saulhinojosa.site/blog/galena-ai/)
