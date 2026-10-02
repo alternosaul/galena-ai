@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { DetectionResult } from "./detection";
 import { DEFAULT_DETECTOR_ID, DETECTORS, findDetector } from "./detectors.data";
-import { alturWavIssues, describeWavIssue, parseWavHeader } from "./wav";
+import { apiWavIssues, describeWavIssue, parseWavHeader } from "./wav";
 
 /**
  * Cliente de la API de modelos (services/model-api: 6 detectores ONNX). Solo se usa desde las
@@ -11,7 +11,9 @@ import { alturWavIssues, describeWavIssue, parseWavHeader } from "./wav";
  * Variables de entorno (en la VPS: /etc/galena-ai.env):
  *   MODEL_API_URL         URL base, p. ej. http://127.0.0.1:8000.
  *                         Si no está definida, el sitio responde en modo simulado.
- *   MODEL_API_TIMEOUT_MS  Tiempo máximo por detección (por defecto 30000 ms).
+ *   MODEL_API_TIMEOUT_MS  Tiempo máximo por detección (por defecto 280000 ms: si la API de modelos
+ *                         estaba dormida, la primera petición espera a que arranque; queda por
+ *                         debajo del máximo de 300 s de una función de Vercel).
  */
 
 const upstreamDetectionSchema = z.object({
@@ -90,7 +92,7 @@ export function modelApiBaseUrl(): string | null {
 
 function detectionTimeoutMs() {
   const value = Number(process.env["MODEL_API_TIMEOUT_MS"]);
-  return Number.isFinite(value) && value > 0 ? value : 30_000;
+  return Number.isFinite(value) && value > 0 ? value : 280_000;
 }
 
 /** Valida el WAV, llama a la API de modelos (o simula) y arma la respuesta del sitio. */
@@ -99,7 +101,10 @@ export async function runDetection(input: DetectionInput): Promise<DetectionResu
   if (!detector) throw new DetectionError(`Detector desconocido: ${input.detector}`, 400);
 
   const info = parseWavHeader(input.wavBytes);
-  const issues = alturWavIssues(info);
+  // El sitio sube solo el canal del cliente (mono) a los detectores que no miden turnos; el JSON
+  // público mantiene el contrato estéreo.
+  const allowMono = input.inputType === "audio_upload" && !detector.stereo_only;
+  const issues = apiWavIssues(info, allowMono);
   if (!info || issues.length > 0) {
     throw new DetectionError(issues.map(describeWavIssue).join("; "), 400);
   }
@@ -108,7 +113,7 @@ export async function runDetection(input: DetectionInput): Promise<DetectionResu
   const receivedAt = new Date().toISOString();
   const base = modelApiBaseUrl();
   const prediction = base
-    ? await callModelApi(base, input, detector.id)
+    ? await callModelApi(base, input, detector.id, info.channels)
     : await simulatePrediction(input, detector.id, detector.threshold);
 
   return {
@@ -130,7 +135,12 @@ export async function runDetection(input: DetectionInput): Promise<DetectionResu
   };
 }
 
-async function callModelApi(base: string, input: DetectionInput, detectorId: string) {
+async function callModelApi(
+  base: string,
+  input: DetectionInput,
+  detectorId: string,
+  channels: number,
+) {
   let res: Response;
   try {
     res = await fetch(`${base}/detect?detector=${encodeURIComponent(detectorId)}`, {
@@ -140,7 +150,7 @@ async function callModelApi(base: string, input: DetectionInput, detectorId: str
         call_id: input.callId,
         audio_base64: input.audioBase64,
         sample_rate: 8000,
-        channels: 2,
+        channels,
       }),
       signal: AbortSignal.timeout(detectionTimeoutMs()),
     });
@@ -229,8 +239,13 @@ export async function getModelApiHealth(): Promise<ModelApiHealth> {
       ok: parsed.data.status === "ok",
       latency_ms: Date.now() - started,
       default_detector: parsed.data.default_detector ?? null,
-      available_detectors: parsed.data.available_detectors ?? [],
-      thresholds: parsed.data.thresholds ?? {},
+      // Solo se exponen los detectores del catálogo público, aunque la API de modelos cargue más.
+      available_detectors: (parsed.data.available_detectors ?? []).filter((id) =>
+        Boolean(findDetector(id)),
+      ),
+      thresholds: Object.fromEntries(
+        Object.entries(parsed.data.thresholds ?? {}).filter(([id]) => findDetector(id)),
+      ),
       error: null,
     };
   } catch (error) {

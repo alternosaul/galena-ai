@@ -12,12 +12,13 @@ import {
   ConfusionMatrix,
   EmptyChartState,
   GeneralizationChart,
+  GeneratorChart,
   PrChart,
   RocChart,
   ScoreChart,
   StatTile,
 } from "@/components/model-charts";
-import { evaluationFor, type ModelDataset, type ModelInfo } from "@/lib/detection";
+import { evaluationFor, type ModelInfo } from "@/lib/detection";
 import { DEFAULT_DETECTOR_ID } from "@/lib/detectors.data";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { deriveMetrics } from "@/lib/metrics";
@@ -41,10 +42,9 @@ function ModelPage() {
   const { t, locale } = useI18n();
   const { data: models = [], isLoading } = useQuery(modelsQueryOptions);
   const [selectedId, setSelectedId] = useState(DEFAULT_DETECTOR_ID);
-  const [dataset, setDataset] = useState<ModelDataset>("Altur");
 
   const selected = models.find((m) => m.id === selectedId) ?? models[0];
-  const evaluation = selected ? evaluationFor(selected, dataset) : null;
+  const evaluation = selected ? evaluationFor(selected) : null;
   const derived = useMemo(() => deriveMetrics(evaluation), [evaluation]);
 
   if (isLoading || !selected) {
@@ -65,9 +65,8 @@ function ModelPage() {
   const recommended = models
     .filter((m) => m.rank !== null)
     .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
-  const experimental = models.filter((m) => m.rank === null);
   const emptyMessage = t("model.notApplicable");
-  const chartKey = `${selected.id}-${dataset}`;
+  const chartKey = selected.id;
 
   const stats: { key: TKey; desc: TKey; value: number | null; format: StatFormat }[] = [
     {
@@ -109,12 +108,14 @@ function ModelPage() {
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("model.title")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight flat:t-display flat:text-5xl md:flat:text-6xl editorial:font-extrabold">
+            {t("model.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">{t("model.subtitle")}</p>
         </div>
         <p className="flex max-w-md items-start gap-2 rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
           <FlaskConical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-          {t("model.placeholderNote")}
+          {t("model.dataNote")}
         </p>
       </div>
 
@@ -128,22 +129,6 @@ function ModelPage() {
               models={models}
               active={m.id === selected.id}
               onSelect={() => setSelectedId(m.id)}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <SectionTitle>{t("model.experimental")}</SectionTitle>
-        <div className="grid gap-3 md:grid-cols-3" role="radiogroup">
-          {experimental.map((m) => (
-            <ModelCard
-              key={m.id}
-              model={m}
-              models={models}
-              active={m.id === selected.id}
-              onSelect={() => setSelectedId(m.id)}
-              compact
             />
           ))}
         </div>
@@ -169,28 +154,7 @@ function ModelPage() {
               : emptyMessage}
           </p>
         </div>
-        <ToggleGroup
-          type="single"
-          size="sm"
-          variant="outline"
-          value={dataset}
-          onValueChange={(v) => v && setDataset(v as ModelDataset)}
-          aria-label={t("model.dataset")}
-        >
-          <ToggleGroupItem value="Altur" className="px-3 text-xs">
-            {t("model.datasetCalls")}
-          </ToggleGroupItem>
-          <ToggleGroupItem value="AlternativeData" className="px-3 text-xs">
-            {t("model.datasetClips")}
-          </ToggleGroupItem>
-        </ToggleGroup>
       </div>
-
-      {evaluation?.train_only_reference && (
-        <p className="-mt-3 text-xs text-muted-foreground">
-          {t("model.trainOnlyNote", { threshold: evaluation.threshold.toFixed(3) })}
-        </p>
-      )}
 
       <div key={`stats-${chartKey}`} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map((s, i) => (
@@ -216,17 +180,35 @@ function ModelPage() {
             ) : undefined
           }
         >
-          {derived.auc !== null && derived.eer !== null ? (
-            <RocChart key={chartKey} auc={derived.auc} eer={derived.eer} color={color} />
+          {evaluation && derived.eer !== null ? (
+            <RocChart
+              key={chartKey}
+              points={evaluation.roc}
+              eer={derived.eer}
+              operating={
+                derived.falsePositiveRate !== null && derived.recall !== null
+                  ? { fpr: derived.falsePositiveRate, tpr: derived.recall }
+                  : null
+              }
+              color={color}
+            />
           ) : (
             <EmptyChartState message={emptyMessage} height={280} />
           )}
         </ChartCard>
-        <ChartCard title={t("chart.pr")} description={t("chart.prDesc")}>
-          {derived.auc !== null && derived.positives !== null && derived.negatives !== null ? (
+        <ChartCard
+          title={t("chart.pr")}
+          description={t("chart.prDesc")}
+          aside={
+            evaluation?.average_precision != null ? (
+              <Badge variant="outline">AP {evaluation.average_precision.toFixed(3)}</Badge>
+            ) : undefined
+          }
+        >
+          {evaluation && derived.positives !== null && derived.negatives !== null ? (
             <PrChart
               key={chartKey}
-              auc={derived.auc}
+              points={evaluation.pr}
               positives={derived.positives}
               negatives={derived.negatives}
               color={color}
@@ -243,13 +225,11 @@ function ModelPage() {
           )}
         </ChartCard>
         <ChartCard title={t("chart.scores")} description={t("chart.scoresDesc")}>
-          {derived.auc !== null && derived.positives !== null && derived.negatives !== null ? (
+          {evaluation ? (
             <ScoreChart
               key={chartKey}
-              auc={derived.auc}
-              positives={derived.positives}
-              negatives={derived.negatives}
-              threshold={evaluation?.threshold ?? selected.threshold}
+              scores={evaluation.scores}
+              threshold={evaluation.threshold}
             />
           ) : (
             <EmptyChartState message={emptyMessage} />
@@ -261,8 +241,12 @@ function ModelPage() {
         <GeneralizationChart models={models} selectedId={selected.id} />
       </ChartCard>
 
+      <ChartCard title={t("chart.generators")} description={t("chart.generatorsDesc")}>
+        <GeneratorChart models={models} selectedId={selected.id} />
+      </ChartCard>
+
       <ChartCard title={t("chart.compare")} description={t("chart.compareDesc")}>
-        <CompareChart models={models} selectedId={selected.id} dataset={dataset} />
+        <CompareChart models={models} selectedId={selected.id} />
       </ChartCard>
     </div>
   );
@@ -291,8 +275,8 @@ function ModelCard({
 }) {
   const { t, lang } = useI18n();
   const color = modelColor(models, model.id);
-  const calls = evaluationFor(model, "Altur");
-  const clips = evaluationFor(model, "AlternativeData");
+  const clips = evaluationFor(model);
+  const fpr = clips ? deriveMetrics(clips).falsePositiveRate : null;
 
   return (
     <button
@@ -359,8 +343,11 @@ function ModelCard({
       )}
 
       <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1 border-t border-border pt-2 font-mono text-[11px] text-muted-foreground">
-        <span>Altur AUC {calls?.auc?.toFixed(3) ?? "—"}</span>
-        <span>AltData AUC {clips?.auc?.toFixed(3) ?? "n/a"}</span>
+        <span>AUC {clips?.auc?.toFixed(3) ?? "—"}</span>
+        <span>EER {clips?.eer != null ? `${(clips.eer * 100).toFixed(1)}%` : "—"}</span>
+        <span>
+          {t("metric.fpr")} {fpr !== null ? `${(fpr * 100).toFixed(1)}%` : "—"}
+        </span>
         {model.stereo_only && <span className="font-sans">{t("model.stereoOnly")}</span>}
       </div>
     </button>

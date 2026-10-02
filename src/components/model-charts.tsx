@@ -30,11 +30,12 @@ import { useCountUp } from "@/hooks/use-count-up";
 import {
   evaluationFor,
   type ConfusionCounts,
-  type ModelDataset,
+  type EvaluationSubset,
+  type ModelEvaluation,
   type ModelInfo,
 } from "@/lib/detection";
 import { useI18n, type TKey } from "@/lib/i18n";
-import { deriveMetrics, prCurve, rocCurve, scoreDistribution } from "@/lib/metrics";
+import { deriveMetrics } from "@/lib/metrics";
 import { modelColor } from "@/lib/model-colors";
 import { cn } from "@/lib/utils";
 
@@ -136,9 +137,20 @@ export function EmptyChartState({ message, height = 250 }: { message: string; he
 
 // ── Curva ROC ────────────────────────────────────────────────────────────────
 
-export function RocChart({ auc, eer, color }: { auc: number; eer: number; color: string }) {
+/** Curva ROC real, con el punto EER y el punto de operación del umbral del modelo. */
+export function RocChart({
+  points,
+  eer,
+  operating,
+  color,
+}: {
+  points: [number, number][];
+  eer: number;
+  operating: { fpr: number; tpr: number } | null;
+  color: string;
+}) {
   const { t } = useI18n();
-  const data = useMemo(() => rocCurve(auc), [auc]);
+  const data = useMemo(() => points.map(([fpr, tpr]) => ({ fpr, tpr })), [points]);
 
   return (
     <ResponsiveContainer width="100%" height={280}>
@@ -197,6 +209,22 @@ export function RocChart({ auc, eer, color }: { auc: number; eer: number; color:
             fontSize: 11,
           }}
         />
+        {operating && (
+          <ReferenceDot
+            x={operating.fpr}
+            y={operating.tpr}
+            r={5}
+            fill="var(--color-card)"
+            stroke={color}
+            strokeWidth={2.5}
+            label={{
+              value: t("chart.operatingPoint"),
+              position: "bottom",
+              fill: "var(--color-foreground)",
+              fontSize: 11,
+            }}
+          />
+        )}
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -204,20 +232,28 @@ export function RocChart({ auc, eer, color }: { auc: number; eer: number; color:
 
 // ── Curva Precisión-Recall ───────────────────────────────────────────────────
 
+/** Curva precisión-recall real; la línea base es la proporción de IA en el conjunto. */
 export function PrChart({
-  auc,
+  points,
   positives,
   negatives,
   color,
 }: {
-  auc: number;
+  points: [number, number][];
   positives: number;
   negatives: number;
   color: string;
 }) {
   const { t } = useI18n();
-  const data = useMemo(() => prCurve(auc, positives, negatives), [auc, positives, negatives]);
+  const data = useMemo(
+    () => points.map(([recall, precision]) => ({ recall, precision })),
+    [points],
+  );
   const baseline = positives / (positives + negatives);
+  // Con mucha más IA que humanos la precisión vive cerca de 1: el eje empieza bajo la línea base.
+  const lowest = Math.min(baseline, ...points.map(([, precision]) => precision));
+  const yMin = Math.max(0, Math.floor((lowest - 0.02) * 20) / 20);
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => Number((yMin + (1 - yMin) * f).toFixed(3)));
 
   return (
     <ResponsiveContainer width="100%" height={280}>
@@ -237,7 +273,15 @@ export function PrChart({
           {...AXIS}
           label={{ value: "Recall", position: "insideBottom", offset: -14, ...AXIS_LABEL }}
         />
-        <YAxis type="number" domain={[0, 1]} ticks={UNIT_TICKS} width={40} {...AXIS} />
+        <YAxis
+          type="number"
+          domain={[yMin, 1]}
+          ticks={yTicks}
+          width={44}
+          allowDataOverflow
+          {...AXIS}
+          tickFormatter={(v: number) => v.toFixed(2)}
+        />
         <ReferenceLine
           y={baseline}
           stroke="var(--color-muted-foreground)"
@@ -368,21 +412,31 @@ export function ConfusionMatrix({ confusion }: { confusion: ConfusionCounts }) {
 
 // ── Distribución de puntajes ─────────────────────────────────────────────────
 
+/**
+ * Histograma real de P(sintético) por clase. Cada clase se muestra como porcentaje de su total:
+ * hay muchas más voces de IA que humanas y con conteos la curva humana no se vería.
+ */
 export function ScoreChart({
-  auc,
-  positives,
-  negatives,
+  scores,
   threshold,
 }: {
-  auc: number;
-  positives: number;
-  negatives: number;
+  scores: ModelEvaluation["scores"];
   threshold: number;
 }) {
-  const { t, locale } = useI18n();
-  const data = useMemo(
-    () => scoreDistribution(auc, positives, negatives),
-    [auc, positives, negatives],
+  const { t } = useI18n();
+  const data = useMemo(() => {
+    const humanTotal = scores.human.reduce((a, b) => a + b, 0) || 1;
+    const aiTotal = scores.ai.reduce((a, b) => a + b, 0) || 1;
+    return scores.human.map((human, i) => ({
+      score: ((scores.bins[i] ?? 0) + (scores.bins[i + 1] ?? 1)) / 2,
+      human: human / humanTotal,
+      ai: (scores.ai[i] ?? 0) / aiTotal,
+    }));
+  }, [scores]);
+  const peak = Math.max(...data.map((d) => Math.max(d.human, d.ai)));
+  const step = peak > 0.4 ? 0.1 : 0.05;
+  const yTicks = Array.from({ length: Math.ceil(peak / step) + 1 }, (_, i) =>
+    Number((i * step).toFixed(2)),
   );
 
   return (
@@ -409,7 +463,13 @@ export function ScoreChart({
               ...AXIS_LABEL,
             }}
           />
-          <YAxis width={52} {...AXIS} tickFormatter={(v: number) => v.toLocaleString(locale)} />
+          <YAxis
+            width={44}
+            domain={[0, yTicks[yTicks.length - 1] ?? 1]}
+            ticks={yTicks}
+            {...AXIS}
+            tickFormatter={(v: number) => pct(v, 0)}
+          />
           <ReferenceLine
             x={threshold}
             stroke="var(--color-foreground)"
@@ -424,8 +484,8 @@ export function ScoreChart({
             cursor={{ stroke: "var(--color-muted-foreground)", strokeWidth: 1 }}
             content={
               <ChartTooltip
-                title={(l) => `${t("chart.score")} ≈ ${Number(l).toFixed(2)}`}
-                format={(v) => v.toLocaleString(locale)}
+                title={(l) => `${t("chart.score")} ≈ ${Number(l).toFixed(3)}`}
+                format={(v) => pct(v)}
               />
             }
           />
@@ -456,19 +516,27 @@ export function ScoreChart({
   );
 }
 
-// ── Generalización entre datasets ────────────────────────────────────────────
+// ── Generalización: subconjuntos del test ────────────────────────────────────
 
 type GeneralizationMetric = "auc" | "balanced_accuracy";
 const GENERALIZATION_LABELS: Record<GeneralizationMetric, TKey> = {
   auc: "metric.auc",
   balanced_accuracy: "metric.balanced",
 };
-// Dos series que representan datasets (no modelos): tokens de gráfica del tema.
-const DATASET_COLORS: Record<ModelDataset, string> = {
-  Altur: "var(--chart-2)",
-  AlternativeData: "var(--chart-4)",
+const SUBSETS: EvaluationSubset[] = [
+  "all",
+  "seen_generators",
+  "unseen_speakers",
+  "unseen_generators",
+];
+const SUBSET_LABELS: Record<EvaluationSubset, TKey> = {
+  all: "subset.all",
+  seen_generators: "subset.seenGenerators",
+  unseen_speakers: "subset.unseenSpeakers",
+  unseen_generators: "subset.unseenGenerators",
 };
 
+/** Cada modelo en el test completo y en los subconjuntos con speakers o generadores nuevos. */
 export function GeneralizationChart({
   models,
   selectedId,
@@ -481,27 +549,26 @@ export function GeneralizationChart({
 
   const data = useMemo(
     () =>
-      models.map((m) => {
-        const row: Record<string, string | number> = {
-          model: m.id === selectedId ? `▸ ${m.name}` : m.name,
-        };
-        for (const dataset of ["Altur", "AlternativeData"] as const) {
-          const value = evaluationFor(m, dataset)?.[metric];
-          if (value !== null && value !== undefined) row[dataset] = value;
+      SUBSETS.map((subset) => {
+        const row: Record<string, string | number> = { subset: t(SUBSET_LABELS[subset]) };
+        for (const m of models) {
+          const value = evaluationFor(m)?.subsets[subset]?.[metric];
+          if (value !== null && value !== undefined) row[m.id] = value;
         }
         return row;
       }),
-    [models, metric, selectedId],
+    [models, metric, t],
   );
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Legend
-          items={[
-            { label: t("model.datasetCalls"), color: DATASET_COLORS.Altur },
-            { label: t("model.datasetClips"), color: DATASET_COLORS.AlternativeData },
-          ]}
+          items={models.map((m) => ({
+            label: m.name,
+            color: modelColor(models, m.id),
+            muted: m.id !== selectedId,
+          }))}
         />
         <ToggleGroup
           type="single"
@@ -518,44 +585,132 @@ export function GeneralizationChart({
           ))}
         </ToggleGroup>
       </div>
-      <div className="overflow-x-auto">
-        <div className="min-w-[560px]">
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={data}
-              margin={{ top: 10, right: 8, bottom: 4, left: 4 }}
-              barGap={2}
-              barCategoryGap="24%"
-            >
-              <CartesianGrid vertical={false} stroke="var(--color-border)" />
-              <XAxis dataKey="model" {...AXIS} interval={0} />
-              <YAxis width={40} domain={[0, 1]} ticks={UNIT_TICKS} {...AXIS} />
-              <ReferenceLine
-                y={0.5}
-                stroke="var(--color-muted-foreground)"
-                strokeOpacity={0.45}
-                strokeDasharray="4 4"
-                label={{ value: t("chart.random"), position: "insideTopRight", ...AXIS_LABEL }}
+      <ModelBars
+        data={data}
+        category="subset"
+        models={models}
+        selectedId={selectedId}
+        barKey={metric}
+        format={(v) => v.toFixed(3)}
+      />
+    </div>
+  );
+}
+
+// ── Detección por generador ──────────────────────────────────────────────────
+
+/** Porcentaje de clips clasificados correctamente por origen, con el umbral de cada modelo. */
+export function GeneratorChart({
+  models,
+  selectedId,
+}: {
+  models: ModelInfo[];
+  selectedId: string;
+}) {
+  const { t, locale } = useI18n();
+
+  const data = useMemo(() => {
+    const reference = evaluationFor(models.find((m) => m.id === selectedId) ?? models[0]!);
+    const generators = [...(reference?.generators ?? [])].sort(
+      (a, b) => Number(b.synthetic) - Number(a.synthetic) || b.n - a.n,
+    );
+    return generators.map((g) => {
+      const label = g.synthetic ? g.generator : t("chart.humanVoices");
+      const row: Record<string, string | number> = {
+        generator: g.seen_in_training ? label : `${label} *`,
+        n: g.n,
+      };
+      for (const m of models) {
+        const value = evaluationFor(m)?.generators.find((x) => x.generator === g.generator);
+        if (value) row[m.id] = value.correct_rate;
+      }
+      return row;
+    });
+  }, [models, selectedId, t]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Legend
+        items={models.map((m) => ({
+          label: m.name,
+          color: modelColor(models, m.id),
+          muted: m.id !== selectedId,
+        }))}
+      />
+      <ModelBars
+        data={data}
+        category="generator"
+        models={models}
+        selectedId={selectedId}
+        barKey="generators"
+        format={(v) => pct(v)}
+        tickFormatter={(v) => pct(v, 0)}
+      />
+      <p className="text-xs text-muted-foreground">
+        {t("chart.generatorsNote", {
+          n: data.reduce((sum, row) => sum + Number(row["n"] ?? 0), 0).toLocaleString(locale),
+        })}
+      </p>
+    </div>
+  );
+}
+
+/** Barras agrupadas por categoría, una por modelo (el seleccionado a opacidad completa). */
+function ModelBars({
+  data,
+  category,
+  models,
+  selectedId,
+  barKey,
+  format,
+  tickFormatter,
+}: {
+  data: Record<string, string | number>[];
+  category: string;
+  models: ModelInfo[];
+  selectedId: string;
+  barKey: string;
+  format: (v: number) => string;
+  tickFormatter?: (v: number) => string;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[560px]">
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart
+            data={data}
+            margin={{ top: 10, right: 8, bottom: 4, left: 4 }}
+            barGap={2}
+            barCategoryGap="20%"
+          >
+            <CartesianGrid vertical={false} stroke="var(--color-border)" />
+            <XAxis dataKey={category} {...AXIS} interval={0} />
+            <YAxis
+              width={44}
+              domain={[0, 1]}
+              ticks={UNIT_TICKS}
+              {...(tickFormatter ? { tickFormatter } : {})}
+              {...AXIS}
+            />
+            <ChartTip
+              cursor={{ fill: "var(--color-muted)", fillOpacity: 0.5 }}
+              content={<ChartTooltip title={(l) => String(l)} format={format} />}
+            />
+            {models.map((m, i) => (
+              <Bar
+                key={`${m.id}-${barKey}`}
+                dataKey={m.id}
+                name={m.name}
+                fill={modelColor(models, m.id)}
+                fillOpacity={m.id === selectedId ? 1 : 0.6}
+                radius={[4, 4, 0, 0]}
+                maxBarSize={26}
+                {...ANIMATION}
+                animationBegin={i * 80}
               />
-              <ChartTip
-                cursor={{ fill: "var(--color-muted)", fillOpacity: 0.5 }}
-                content={<ChartTooltip title={(l) => String(l).replace("▸ ", "")} />}
-              />
-              {(["Altur", "AlternativeData"] as const).map((dataset, i) => (
-                <Bar
-                  key={`${dataset}-${metric}`}
-                  dataKey={dataset}
-                  name={dataset === "Altur" ? t("model.datasetCalls") : t("model.datasetClips")}
-                  fill={DATASET_COLORS[dataset]}
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={28}
-                  {...ANIMATION}
-                  animationBegin={i * 150}
-                />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
@@ -580,21 +735,13 @@ const COMPARE_LABELS: Record<(typeof COMPARE_METRICS)[number], TKey> = {
   f1: "metric.f1",
 };
 
-export function CompareChart({
-  models,
-  selectedId,
-  dataset,
-}: {
-  models: ModelInfo[];
-  selectedId: string;
-  dataset: ModelDataset;
-}) {
+export function CompareChart({ models, selectedId }: { models: ModelInfo[]; selectedId: string }) {
   const { t } = useI18n();
   const [view, setView] = useState<"chart" | "table">("chart");
 
   const derived = useMemo(
-    () => models.map((m) => ({ model: m, d: deriveMetrics(evaluationFor(m, dataset)) })),
-    [models, dataset],
+    () => models.map((m) => ({ model: m, d: deriveMetrics(evaluationFor(m)) })),
+    [models],
   );
 
   const data = useMemo(
@@ -648,7 +795,7 @@ export function CompareChart({
                 />
                 {models.map((m, i) => (
                   <Bar
-                    key={`${m.id}-${dataset}`}
+                    key={`${m.id}-compare`}
                     dataKey={m.id}
                     name={m.name}
                     fill={modelColor(models, m.id)}

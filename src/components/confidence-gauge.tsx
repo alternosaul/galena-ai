@@ -1,3 +1,5 @@
+import { useI18n } from "@/lib/i18n";
+
 type Props = {
   value: number; // 0 - 1
   loading?: boolean;
@@ -7,21 +9,25 @@ type Props = {
 const R = 80;
 const CX = 100;
 const CY = 100;
-const STROKE = 18;
 
 function polar(angleDeg: number, radius = R) {
   const rad = (Math.PI * angleDeg) / 180;
   return { x: CX + radius * Math.cos(rad), y: CY + radius * Math.sin(rad) };
 }
 
-/** Velocímetro semicircular de rojo (0) a verde (1). */
+/**
+ * Velocímetro semicircular. Los colores y el grosor salen del tema (--gauge-* en src/styles.css):
+ * en los temas clásicos va de rojo (0) a verde (1); en los flat, de verde (humano) a rojo (IA).
+ * En los temas flat el número se muestra fuera, junto al velocímetro.
+ */
 export function ConfidenceGauge({ value, loading = false, size = 260 }: Props) {
+  const { t } = useI18n();
   const v = Math.min(1, Math.max(0, value));
   const angle = 180 + v * 180; // 180° (izq) -> 360° (der)
   const start = polar(180);
   const end = polar(360);
-  const needle = polar(angle, R - 14);
   const tip = polar(angle, R + 6);
+  const arc = `M ${start.x} ${start.y} A ${R} ${R} 0 0 1 ${end.x} ${end.y}`;
 
   return (
     <div className="flex flex-col items-center">
@@ -30,36 +36,48 @@ export function ConfidenceGauge({ value, loading = false, size = 260 }: Props) {
         width={size}
         height={size * 0.6}
         role="img"
-        aria-label={`Confianza ${Math.round(v * 100)} por ciento`}
+        aria-label={`${t("field.confidence")} ${Math.round(v * 100)}%`}
+        className="max-w-full"
       >
         <defs>
           <linearGradient id="gauge-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="oklch(0.58 0.222 27.3)" />
-            <stop offset="50%" stopColor="oklch(0.78 0.16 75)" />
-            <stop offset="100%" stopColor="oklch(0.62 0.16 150)" />
+            <stop offset="0%" style={{ stopColor: "var(--gauge-start)" }} />
+            <stop offset="50%" style={{ stopColor: "var(--gauge-mid)" }} />
+            <stop offset="100%" style={{ stopColor: "var(--gauge-end)" }} />
           </linearGradient>
         </defs>
 
         <path
-          d={`M ${start.x} ${start.y} A ${R} ${R} 0 0 1 ${end.x} ${end.y}`}
+          d={arc}
           fill="none"
-          stroke="var(--color-muted)"
-          strokeWidth={STROKE}
+          stroke="var(--gauge-track)"
           strokeLinecap="round"
+          style={{ strokeWidth: "calc(var(--gauge-stroke) + 6px)" }}
+          className="hidden flat:block"
         />
         <path
-          d={`M ${start.x} ${start.y} A ${R} ${R} 0 0 1 ${end.x} ${end.y}`}
+          d={arc}
+          fill="none"
+          stroke="var(--color-muted)"
+          strokeLinecap="round"
+          style={{ strokeWidth: "var(--gauge-stroke)" }}
+          className="flat:hidden"
+        />
+        <path
+          d={arc}
           fill="none"
           stroke="url(#gauge-grad)"
-          strokeWidth={STROKE}
           strokeLinecap="round"
           strokeDasharray={Math.PI * R}
           strokeDashoffset={loading ? Math.PI * R : Math.PI * R * (1 - v)}
-          style={{ transition: "stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1)" }}
+          style={{
+            strokeWidth: "var(--gauge-stroke)",
+            transition: "stroke-dashoffset 800ms cubic-bezier(.22,1,.36,1)",
+          }}
         />
 
         {!loading && (
-          <g style={{ transition: "transform 800ms cubic-bezier(.22,1,.36,1)" }}>
+          <g>
             <line
               x1={CX}
               y1={CY}
@@ -69,22 +87,41 @@ export function ConfidenceGauge({ value, loading = false, size = 260 }: Props) {
               strokeWidth={3}
               strokeLinecap="round"
             />
-            <circle cx={needle.x} cy={needle.y} r={0} />
-            <circle cx={CX} cy={CY} r={6} fill="var(--color-foreground)" />
+            <circle
+              cx={CX}
+              cy={CY}
+              r={6}
+              fill="var(--color-foreground)"
+              className="flat:fill-background flat:stroke-foreground flat:[stroke-width:3px]"
+            />
           </g>
         )}
 
-        <text x={20} y={116} fontSize={9} fill="var(--color-muted-foreground)">
+        <text
+          x={20}
+          y={116}
+          fontSize={9}
+          fill="var(--color-muted-foreground)"
+          className="flat:font-mono"
+        >
           0.0
         </text>
-        <text x={168} y={116} fontSize={9} fill="var(--color-muted-foreground)">
+        <text
+          x={168}
+          y={116}
+          fontSize={9}
+          fill="var(--color-muted-foreground)"
+          className="flat:font-mono"
+        >
           1.0
         </text>
       </svg>
 
-      <div className="-mt-6 text-center">
+      <div className="-mt-6 text-center flat:hidden">
         <p className="text-4xl font-semibold tabular-nums">{loading ? "—" : v.toFixed(3)}</p>
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">Confianza</p>
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">
+          {t("field.confidence")}
+        </p>
       </div>
     </div>
   );

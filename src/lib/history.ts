@@ -1,82 +1,63 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { Database } from "./database.types";
 import type { DetectionResult } from "./detection";
-import { getSupabase } from "./supabase";
 
 /**
- * Historial de detecciones leído de Supabase (public.detections).
- * Las filas las inserta el servidor en /api/public/detect*; RLS devuelve solo las del
- * usuario con sesión (o todas, si es admin).
+ * Historial de detecciones de la demo, guardado en este navegador (localStorage), sin backend.
+ * El detector agrega cada resultado exitoso salvo que la preferencia autoSave esté apagada.
  */
-
-type DetectionRow = Database["public"]["Tables"]["detections"]["Row"];
 
 export const HISTORY_LIMIT = 500;
 
-function toResult(row: DetectionRow): DetectionResult {
-  const metadata = row.request_metadata;
-  const simulated =
-    typeof metadata === "object" && metadata !== null && !Array.isArray(metadata)
-      ? metadata["simulated"] === true
-      : false;
-  // La columna confidence guarda P(sintético); la app muestra la confianza en el veredicto.
-  const isSynthetic = row.is_synthetic ?? false;
-  const pSynthetic = row.confidence ?? 0;
-  return {
-    call_id: row.call_id,
-    is_synthetic: isSynthetic,
-    confidence: Number((isSynthetic ? pSynthetic : 1 - pSynthetic).toFixed(6)),
-    p_synthetic: pSynthetic,
-    model: row.detector_id,
-    latency_ms: row.latency_ms ?? 0,
-    received_at: row.created_at,
-    ...(row.threshold !== null ? { threshold: row.threshold } : {}),
-    ...(row.api_detection_id ? { detection_id: row.api_detection_id } : {}),
-    ...(row.source ? { source: row.source } : {}),
-    ...(row.file_name ? { file_name: row.file_name } : {}),
-    ...(row.duration_sec !== null ? { duration_sec: row.duration_sec } : {}),
-    ...(row.sample_rate !== null ? { sample_rate: row.sample_rate } : {}),
-    ...(row.channels !== null ? { channels: row.channels } : {}),
-    ...(simulated ? { simulated: true } : {}),
+const STORAGE_KEY = "galena.history";
+const QUERY_KEY = ["detections"] as const;
+
+function readHistory(): DetectionResult[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
+    return Array.isArray(parsed) ? (parsed as DetectionResult[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeHistory(items: DetectionResult[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, HISTORY_LIMIT)));
+  } catch {
+    // Almacenamiento lleno o no disponible: la detección se muestra pero no se guarda.
+  }
+}
+
+export const historyQueryOptions = queryOptions({
+  queryKey: QUERY_KEY,
+  queryFn: async () => readHistory(),
+});
+
+export function useDetectionHistory() {
+  return useQuery(historyQueryOptions);
+}
+
+/** Agrega una detección al inicio del historial y refresca la vista. */
+export function useAddToHistory() {
+  const queryClient = useQueryClient();
+  return (result: DetectionResult) => {
+    writeHistory([result, ...readHistory()]);
+    void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
   };
 }
 
-export const historyQueryOptions = (userId: string | undefined) =>
-  queryOptions({
-    queryKey: ["detections", userId ?? "anonymous"],
-    enabled: !!userId,
-    queryFn: async () => {
-      const { data, error } = await getSupabase()
-        .from("detections")
-        .select("*")
-        .eq("status", "completed")
-        .order("created_at", { ascending: false })
-        .limit(HISTORY_LIMIT);
-      if (error) throw new Error(error.message);
-      return data.map(toResult);
-    },
-  });
-
-export function useDetectionHistory(userId: string | undefined) {
-  return useQuery(historyQueryOptions(userId));
-}
-
-/** Tras una detección nueva: vuelve a leer el historial. */
-export function useInvalidateHistory() {
-  const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: ["detections"] });
-}
-
-/** Borra el historial propio (RLS: "users delete own detections"). */
-export function useClearHistory(userId: string | undefined) {
+export function useClearHistory() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      if (!userId) return;
-      const { error } = await getSupabase().from("detections").delete().eq("user_id", userId);
-      if (error) throw new Error(error.message);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // almacenamiento no disponible
+      }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["detections"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
   });
 }

@@ -16,9 +16,15 @@ El orden sigue el ranking general de `MODELS_FINAL_COMPARISON.md` (promedio en l
 
 ## Procedencia
 
-`final_models/` y `src/backend/` se copiaron **sin cambios** (SHA-256 idénticos) de
-`lamunuwa/galena-live`, rama `feat/synthetic-voice-detection-models`, commit `307b538`. Solo `app.py`
-es propio de este servicio. Para actualizar los modelos, vuelve a copiar esos archivos.
+`final_models/` y `src/backend/` se copiaron de `lamunuwa/galena-live`, rama
+`feat/synthetic-voice-detection-models`, commit `307b538`. `app.py` es propio de este servicio.
+
+Único cambio sobre la copia: `src/backend/features/extract.py` calcula `librosa.yin` por chunks de
+~10 s (`_yin_chunked`). Sobre la llamada completa, `librosa.yin` reservaba FFTs complejas de todos los
+frames a la vez (~375 MB para 137 s) y agotaba la instancia de 512 MB. YIN procesa cada frame por
+separado, así que el F0, todas las features y las predicciones son idénticos bit a bit (verificado en
+llamadas de 0.4 s a 216 s y en `tests/test_features.py`). Si vuelves a copiar `extract.py`, conserva
+ese cambio.
 
 ## Contrato
 
@@ -38,6 +44,56 @@ Errores: 400 (JSON, base64, WAV o detector inválido), 415 (no JSON), 503 (sin p
 
 `GET /health` → `{status, default_detector, available_detectors, thresholds, models}`.
 
+## Despliegue
+
+`Dockerfile` construye la imagen de servicio. El contenedor escucha en `$PORT` (7860 por defecto):
+
+```bash
+docker build -t galena-model-api .
+docker run --rm -p 8000:8000 -e PORT=8000 galena-model-api
+```
+
+La demo pública corre en **Render** (plan Free, runtime Docker, Root Directory `services/model-api`).
+Hugging Face Spaces ya no ofrece Docker en su hardware gratuito.
+
+Medido localmente con los límites que se asumen para Render Free (512 MB, 0.1 CPU), con una llamada
+de 100 s:
+
+| Configuración | Arranque | 1.ª detección | Siguientes | Memoria |
+|---|---|---|---|---|
+| 6 detectores, con calentamiento | ~246 s | ~20 s | ~9–20 s | ~284 MB |
+| 6 detectores, `GALENA_WARMUP=0` | ~27 s | ~213 s (Everest) | ~9–20 s | ~210 MB |
+| Solo acústicos (`fuji,montblanc,acoustic-baseline`) | ~25 s | ~5 s | ~4 s | ~130 MB |
+
+El costo de los detectores Galena (Everest, Galena Full, Galena Client-only) es numba compilando
+las funciones vectorizadas de librosa al importarlas, en cada arranque del proceso: la caché en disco
+de numba no lo evitó. `GALENA_WARMUP=0` solo lo mueve del arranque a la primera detección.
+
+Render Free apaga el servicio tras 15 min sin tráfico y tarda ~1 min en volver a encenderlo, y una
+función de Vercel se corta a los 300 s. Dos configuraciones funcionan:
+
+1. **Los 6 detectores, siempre despiertos.** Calentamiento activado (por defecto) y un monitor externo
+   gratuito (p. ej. UptimeRobot) que haga `GET /health` cada 10 min para que Render no lo apague.
+   Un servicio 24/7 usa ~744 de las 750 horas gratuitas al mes. El arranque de ~4 min solo ocurre
+   tras un deploy o reinicio.
+2. **Solo acústicos, sin monitor.** `GALENA_DETECTORS=fuji,montblanc,acoustic-baseline` y
+   `GALENA_DEFAULT_DETECTOR=fuji` (también en Vercel). Aun despertando, la primera detección llega
+   en ~1.5 min. El sitio solo ofrece los detectores que la API reporta como cargados.
+
+Memoria con el límite de 512 MB, usando los valores por defecto del `Dockerfile`: pico de 411 MB con
+los 6 detectores cargados (llamadas de 96 a 150 s, dos solicitudes simultáneas y 30 detecciones
+seguidas), y la memoria vuelve a ~272 MB tras cada detección. El `Dockerfile` fija para instancias
+pequeñas `GALENA_INFERENCE_SLOTS=1`, `GALENA_MAX_SECONDS=150` y `MALLOC_*` (que numpy devuelva la
+memoria al liberarla); una llamada de 290 s con detectores Galena no cabe en 512 MB.
+
+Notas de operación:
+
+- Con una sola plaza de inferencia, una segunda solicitud simultánea recibe 503 ("Servidor ocupado").
+- Los detectores que no se carguen responden 400, y `GALENA_DEFAULT_DETECTOR` debe estar entre los
+  cargados.
+- No lleva CORS a propósito: solo la habla el servidor del sitio vía `MODEL_API_URL`, nunca el
+  navegador. Si algún día se expone al navegador, hay que añadir `CORSMiddleware`.
+
 ## Desarrollo
 
 ```bash
@@ -48,4 +104,6 @@ GALENA_TEST_CALL=/ruta/call.wav .venv/bin/python -m pytest tests   # incluye una
 .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-Variables: `GALENA_DEFAULT_DETECTOR` (por defecto `everest`), `GALENA_MODELS_DIR`, `GALENA_INFERENCE_SLOTS` (2).
+Variables: `GALENA_DEFAULT_DETECTOR` (por defecto `everest`), `GALENA_DETECTORS` (todos),
+`GALENA_WARMUP` (`1`; `0` omite el calentamiento), `GALENA_MODELS_DIR`, `GALENA_INFERENCE_SLOTS` (2),
+`GALENA_MAX_SECONDS` (300). El `Dockerfile` cambia algunos de estos valores por defecto (ver Despliegue).

@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { saveDetection } from "@/lib/detections.server";
 import { detectionErrorResponse, jsonResponse, runDetection } from "@/lib/model-api";
 import { bytesToBase64 } from "@/lib/wav";
 
@@ -47,7 +46,6 @@ export const Route = createFileRoute("/api/public/detect/audio")({
             fileName: file.name,
           });
           result.latency_ms = Date.now() - startedAt;
-          await saveDetection(request, { result, inputType: "audio_upload", wavBytes });
           return jsonResponse(result);
         } catch (error) {
           return detectionErrorResponse(error);

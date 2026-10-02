@@ -115,3 +115,28 @@ def test_real_call(client, detector):
     audio = base64.b64encode(Path(REAL_CALL).read_bytes()).decode("ascii")
     resp = client.post(f"/detect?detector={detector}", json=body(audio, call_id=Path(REAL_CALL).stem))
     assert resp.status_code == 200, resp.text
+
+
+def test_detector_subset_without_warmup(monkeypatch):
+    monkeypatch.setenv("GALENA_DETECTORS", "everest, fuji")
+    monkeypatch.setenv("GALENA_WARMUP", "0")
+    with TestClient(app) as subset:
+        assert subset.get("/health").json()["available_detectors"] == ["everest", "fuji"]
+        assert subset.post("/detect?detector=fuji", json=body(wav_base64())).status_code == 200
+        assert subset.post("/detect?detector=galena-full", json=body(wav_base64())).status_code == 400
+
+
+def test_unknown_detector_in_env_fails_startup(monkeypatch):
+    monkeypatch.setenv("GALENA_DETECTORS", "everest,k2")
+    with pytest.raises(ValueError, match="k2"):
+        with TestClient(app):
+            pass
+
+
+def test_call_longer_than_max_seconds_is_400(client, monkeypatch):
+    import app as app_module
+
+    monkeypatch.setattr(app_module, "MAX_SECONDS", 2)
+    response = client.post("/detect?detector=fuji", json=body(wav_base64(seconds=3.0)))
+    assert response.status_code == 400
+    assert "2 segundos" in response.json()["error"]

@@ -1,18 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, type CSSProperties } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
+import { BetaNotice } from "@/components/beta-notice";
 import { BrandLogo } from "@/components/brand-logo";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 
-/** Rutas accesibles sin sesión; se muestran sin sidebar ni header. */
+/** Rutas que se muestran sin sidebar ni header. */
 const PUBLIC_PATHS = new Set(["/login"]);
 
 /**
- * Protege las rutas del lado del cliente mientras la autenticación es simulada.
- * TODO(auth): con sesión real en cookie, mover esta verificación a `beforeLoad`.
+ * Demo sin autenticación: se entra directo al dashboard y ninguna ruta exige sesión.
+ * /login sigue existiendo y funcionando; quien inicie sesión recupera su perfil y su historial.
+ * TODO(auth): para volver a protegerlas, redirigir a /login cuando `status` sea "unauthenticated"
+ * (preferiblemente desde `beforeLoad`, con la sesión en cookie).
  */
 export function AppShell() {
   const { status } = useAuth();
@@ -21,20 +24,23 @@ export function AppShell() {
   const isPublic = PUBLIC_PATHS.has(pathname);
 
   useEffect(() => {
-    if (status === "unauthenticated" && !isPublic) void navigate({ to: "/login", replace: true });
+    // Tras iniciar sesión se sale del panel de login; sin sesión no se redirige a ningún lado.
     if (status === "authenticated" && isPublic) void navigate({ to: "/", replace: true });
   }, [status, isPublic, navigate]);
 
   if (isPublic) return <Outlet />;
-  if (status !== "authenticated") return <SplashScreen />;
+  // Solo se espera mientras se lee el usuario de demo guardado; si no hay, se entra igual.
+  if (status === "loading") return <SplashScreen />;
 
   return (
-    <SidebarProvider>
+    // El ancho del menú lateral depende del tema (--app-sidebar-width en src/styles.css).
+    <SidebarProvider style={{ "--sidebar-width": "var(--app-sidebar-width)" } as CSSProperties}>
       <div className="flex min-h-screen w-full bg-background">
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
-          <main className="flex-1 p-4 md:p-6">
+          <BetaNotice />
+          <main className="min-w-0 flex-1 p-4 md:p-6 md:flat:p-10">
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
           </main>

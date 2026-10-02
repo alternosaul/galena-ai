@@ -3,6 +3,11 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+/* Layout "flat" (temas editorial, terminal y nocturne) y variantes por tema: ver src/lib/theme.tsx */
+@custom-variant flat (&:is([data-layout="flat"] *));
+@custom-variant editorial (&:is([data-theme="editorial"] *));
+@custom-variant terminal (&:is([data-theme="terminal"] *));
+@custom-variant nocturne (&:is([data-theme="nocturne"] *));
 
 /*
  * Design system definition.
@@ -64,6 +69,20 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+  --font-display: var(--app-font-display);
+  --color-rule: var(--rule);
+  --color-section: var(--section);
+  --color-ai: var(--ai);
+  --color-ai-soft: var(--ai-soft);
+  --color-ai-border: var(--ai-border);
+  --color-human: var(--human);
+  --color-tab-active: var(--tab-active);
+  --color-tab-active-foreground: var(--tab-active-foreground);
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
+  --color-warp: var(--warp);
 }
 
 /*
@@ -76,6 +95,24 @@
 
 :root {
   --radius: 0.5rem;
+  /* Tipografía y tokens de los temas (los temas flat los redefinen más abajo) */
+  --app-font-sans:
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    "Noto Color Emoji";
+  --app-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  --app-font-display: var(--app-font-sans);
+  --display-weight: 700;
+  --display-tracking: -0.02em;
+  --display-transform: none;
+  --button-font: var(--app-font-sans);
+  --app-sidebar-width: 16rem;
+  --gauge-start: oklch(0.58 0.222 27.3);
+  --gauge-mid: oklch(0.78 0.16 75);
+  --gauge-end: oklch(0.62 0.16 150);
+  --gauge-track: var(--muted);
+  --gauge-stroke: 18px;
   /* Series categóricas de gráficas (validadas CVD; ver src/components/model-charts.tsx) */
   --series-1: #ff671f;
   --series-2: #2f7da8;
@@ -117,6 +154,19 @@
   --sidebar-accent-foreground: oklch(0.98 0.008 45);
   --sidebar-border: oklch(0.38 0.055 238.5);
   --sidebar-ring: oklch(0.698 0.2 41.5);
+  --rule: var(--border);
+  --section: var(--foreground);
+  --ai: var(--destructive);
+  --ai-soft: var(--destructive);
+  --ai-border: var(--destructive);
+  --human: var(--success);
+  --tab-active: var(--background);
+  --tab-active-foreground: var(--foreground);
+  /* Color de llamada a la acción y de la luz que recorre la caja de audio (temas flat) */
+  --cta: var(--primary);
+  --cta-foreground: var(--primary-foreground);
+  --warp: var(--primary);
+  --warp-2: var(--primary);
 }
 
 .dark {
@@ -162,6 +212,357 @@
   --sidebar-ring: oklch(0.698 0.2 41.5);
 }
 
+/*
+ * ── Temas flat ─────────────────────────────────────────────────────────────────
+ * Mismo layout, distinta piel. :root[data-theme] gana en especificidad a :root y .dark.
+ * En estos temas el velocímetro va de humano (0, verde) a IA (1, rojo): marca P(sintético).
+ */
+
+/* Editorial: papel cálido, tinta negra, grotesca pesada y mono */
+:root[data-theme="editorial"] {
+  --radius: 0rem;
+  --app-font-sans: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --app-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --app-font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --display-weight: 700;
+  --display-tracking: -0.025em;
+  --button-font: var(--app-font-mono);
+  --app-sidebar-width: 22.5rem;
+  --background: oklch(0.957 0.005 95);
+  --foreground: oklch(0.2 0.006 270);
+  --card: oklch(0.957 0.005 95);
+  --card-foreground: oklch(0.2 0.006 270);
+  --popover: oklch(0.975 0.004 95);
+  --popover-foreground: oklch(0.2 0.006 270);
+  --primary: oklch(0.2 0.006 270);
+  --primary-foreground: oklch(0.957 0.005 95);
+  --secondary: oklch(0.915 0.006 90);
+  --secondary-foreground: oklch(0.2 0.006 270);
+  --muted: oklch(0.915 0.006 90);
+  --muted-foreground: oklch(0.5 0.006 90);
+  --accent: oklch(0.915 0.006 90);
+  --accent-foreground: oklch(0.2 0.006 270);
+  --destructive: oklch(0.55 0.17 30);
+  --destructive-foreground: oklch(0.975 0.004 95);
+  --success: oklch(0.52 0.1 150);
+  --success-foreground: oklch(0.975 0.004 95);
+  --border: oklch(0.86 0.008 90);
+  --input: oklch(0.2 0.006 270);
+  --ring: oklch(0.2 0.006 270);
+  --rule: oklch(0.2 0.006 270);
+  --section: oklch(0.2 0.006 270);
+  --ai: oklch(0.2 0.006 270);
+  --ai-soft: transparent;
+  --ai-border: oklch(0.2 0.006 270);
+  --human: oklch(0.2 0.006 270);
+  --tab-active: oklch(0.2 0.006 270);
+  --tab-active-foreground: oklch(0.957 0.005 95);
+  --cta: oklch(0.58 0.21 32);
+  --cta-foreground: oklch(0.985 0.004 95);
+  --warp: oklch(0.62 0.22 32);
+  --warp-2: oklch(0.8 0.16 70);
+  --sidebar: oklch(0.957 0.005 95);
+  --sidebar-foreground: oklch(0.2 0.006 270);
+  --sidebar-primary: oklch(0.2 0.006 270);
+  --sidebar-primary-foreground: oklch(0.957 0.005 95);
+  --sidebar-accent: transparent;
+  --sidebar-accent-foreground: oklch(0.2 0.006 270);
+  --sidebar-border: oklch(0.2 0.006 270);
+  --sidebar-ring: oklch(0.2 0.006 270);
+  --gauge-start: oklch(0.52 0.1 150);
+  --gauge-mid: oklch(0.78 0.14 82);
+  --gauge-end: oklch(0.55 0.17 30);
+  --gauge-track: oklch(0.905 0.007 90);
+  --gauge-stroke: 13px;
+}
+
+/* Terminal: consola verde oscuro, acento lima, display técnica y todo en mono */
+:root[data-theme="terminal"] {
+  --radius: 0rem;
+  --app-font-sans: "JetBrains Mono", ui-monospace, monospace;
+  --app-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --app-font-display: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --display-weight: 700;
+  --display-tracking: 0.04em;
+  --display-transform: uppercase;
+  --button-font: var(--app-font-display);
+  --app-sidebar-width: 24rem;
+  --background: oklch(0.18 0.008 120);
+  --foreground: oklch(0.9 0.015 100);
+  --card: oklch(0.18 0.008 120);
+  --card-foreground: oklch(0.9 0.015 100);
+  --popover: oklch(0.21 0.01 120);
+  --popover-foreground: oklch(0.9 0.015 100);
+  --primary: oklch(0.73 0.14 118);
+  --primary-foreground: oklch(0.18 0.008 120);
+  --secondary: oklch(0.235 0.012 120);
+  --secondary-foreground: oklch(0.9 0.015 100);
+  --muted: oklch(0.235 0.012 120);
+  --muted-foreground: oklch(0.64 0.015 110);
+  --accent: oklch(0.25 0.014 120);
+  --accent-foreground: oklch(0.9 0.015 100);
+  --destructive: oklch(0.68 0.13 45);
+  --destructive-foreground: oklch(0.18 0.008 120);
+  --success: oklch(0.73 0.14 118);
+  --success-foreground: oklch(0.18 0.008 120);
+  --border: oklch(0.32 0.014 120);
+  --input: oklch(0.36 0.014 120);
+  --ring: oklch(0.73 0.14 118);
+  --rule: oklch(0.32 0.014 120);
+  --section: oklch(0.73 0.14 118);
+  --ai: oklch(0.68 0.13 45);
+  --ai-soft: oklch(0.215 0.025 40);
+  --ai-border: oklch(0.47 0.11 38);
+  --human: oklch(0.73 0.14 118);
+  --tab-active: oklch(0.73 0.14 118);
+  --tab-active-foreground: oklch(0.18 0.008 120);
+  --cta: oklch(0.88 0.2 124);
+  --cta-foreground: oklch(0.16 0.01 120);
+  --warp: oklch(0.9 0.21 124);
+  --warp-2: oklch(0.86 0.14 190);
+  --sidebar: oklch(0.18 0.008 120);
+  --sidebar-foreground: oklch(0.9 0.015 100);
+  --sidebar-primary: oklch(0.73 0.14 118);
+  --sidebar-primary-foreground: oklch(0.18 0.008 120);
+  --sidebar-accent: oklch(0.235 0.014 120);
+  --sidebar-accent-foreground: oklch(0.95 0.015 100);
+  --sidebar-border: oklch(0.32 0.014 120);
+  --sidebar-ring: oklch(0.73 0.14 118);
+  --gauge-start: oklch(0.63 0.09 140);
+  --gauge-mid: oklch(0.73 0.12 85);
+  --gauge-end: oklch(0.6 0.14 40);
+  --gauge-track: oklch(0.28 0.012 120);
+  --gauge-stroke: 15px;
+}
+
+/* Nocturne: tinta sepia, serif condensada, acento óxido */
+:root[data-theme="nocturne"] {
+  --radius: 0rem;
+  --app-font-sans: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --app-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --app-font-display: "Instrument Serif", ui-serif, Georgia, serif;
+  --display-weight: 400;
+  --display-tracking: -0.015em;
+  --button-font: var(--app-font-mono);
+  --app-sidebar-width: 23.5rem;
+  --background: oklch(0.19 0.008 80);
+  --foreground: oklch(0.93 0.017 80);
+  --card: oklch(0.19 0.008 80);
+  --card-foreground: oklch(0.93 0.017 80);
+  --popover: oklch(0.22 0.009 80);
+  --popover-foreground: oklch(0.93 0.017 80);
+  --primary: oklch(0.55 0.13 38);
+  --primary-foreground: oklch(0.96 0.015 80);
+  --secondary: oklch(0.24 0.01 80);
+  --secondary-foreground: oklch(0.93 0.017 80);
+  --muted: oklch(0.24 0.01 80);
+  --muted-foreground: oklch(0.68 0.02 75);
+  --accent: oklch(0.25 0.011 80);
+  --accent-foreground: oklch(0.93 0.017 80);
+  --destructive: oklch(0.69 0.12 40);
+  --destructive-foreground: oklch(0.19 0.008 80);
+  --success: oklch(0.72 0.07 140);
+  --success-foreground: oklch(0.19 0.008 80);
+  --border: oklch(0.32 0.013 75);
+  --input: oklch(0.38 0.013 75);
+  --ring: oklch(0.69 0.12 40);
+  --rule: oklch(0.32 0.013 75);
+  --section: oklch(0.93 0.017 80);
+  --ai: oklch(0.69 0.12 40);
+  --ai-soft: transparent;
+  --ai-border: oklch(0.55 0.13 38);
+  --human: oklch(0.72 0.07 140);
+  --tab-active: oklch(0.93 0.017 80);
+  --tab-active-foreground: oklch(0.19 0.008 80);
+  --cta: oklch(0.62 0.19 38);
+  --cta-foreground: oklch(0.97 0.012 80);
+  --warp: oklch(0.72 0.18 42);
+  --warp-2: oklch(0.85 0.13 82);
+  --sidebar: oklch(0.19 0.008 80);
+  --sidebar-foreground: oklch(0.93 0.017 80);
+  --sidebar-primary: oklch(0.69 0.12 40);
+  --sidebar-primary-foreground: oklch(0.19 0.008 80);
+  --sidebar-accent: transparent;
+  --sidebar-accent-foreground: oklch(0.96 0.015 80);
+  --sidebar-border: oklch(0.32 0.013 75);
+  --sidebar-ring: oklch(0.69 0.12 40);
+  --gauge-start: oklch(0.6 0.08 145);
+  --gauge-mid: oklch(0.74 0.12 80);
+  --gauge-end: oklch(0.58 0.14 38);
+  --gauge-track: oklch(0.27 0.01 80);
+  --gauge-stroke: 13px;
+}
+
+/* Títulos grandes (página, secciones, veredicto) con la tipografía display del tema */
+@utility t-display {
+  font-family: var(--app-font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  text-transform: var(--display-transform);
+  line-height: 1;
+}
+
+/* Etiquetas pequeñas en mono, mayúsculas y espaciadas */
+@utility t-label {
+  font-family: var(--app-font-mono);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/*
+ * Clase .warp (caja de audio y botón "Usar este audio") en los temas flat: una luz recorre el borde (conic-gradient enmascarado al contorno)
+ * y un halo difuso la acompaña. data-state: idle (recorrido lento), dragging (rápido e intenso),
+ * ready (archivo listo: borde completo y fijo).
+ */
+@property --warp-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes warp-spin {
+  to {
+    --warp-angle: 360deg;
+  }
+}
+
+@keyframes cta-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--cta) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 8px color-mix(in oklab, var(--cta) 0%, transparent);
+  }
+}
+
+[data-layout="flat"] .warp {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-layout="flat"] .warp::before,
+[data-layout="flat"] .warp::after {
+  content: "";
+  position: absolute;
+  inset: -1.5px;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--warp-angle),
+    transparent 0deg 210deg,
+    color-mix(in oklab, var(--warp-2) 70%, transparent) 265deg,
+    var(--warp) 330deg,
+    transparent 360deg
+  );
+  animation: warp-spin 4.5s linear infinite;
+  transition: opacity 300ms ease;
+}
+
+/* Contorno de 2px con la luz */
+[data-layout="flat"] .warp::before {
+  padding: 2.5px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+
+/* Halo difuso detrás del contorno */
+[data-layout="flat"] .warp::after {
+  z-index: -1;
+  filter: blur(14px);
+  opacity: 0.35;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  padding: 10px;
+  inset: -9px;
+}
+
+[data-layout="flat"] .warp:hover::before,
+[data-layout="flat"] .warp:focus-within::before {
+  animation-duration: 2.6s;
+}
+
+[data-layout="flat"] .warp:hover::after {
+  opacity: 0.6;
+  animation-duration: 2.6s;
+}
+
+[data-layout="flat"] .warp[data-state="dragging"]::before,
+[data-layout="flat"] .warp[data-state="dragging"]::after {
+  animation-duration: 1.1s;
+}
+
+[data-layout="flat"] .warp[data-state="dragging"]::after {
+  opacity: 0.85;
+}
+
+[data-layout="flat"] .warp[data-state="ready"]::before {
+  animation: none;
+  background: var(--warp);
+}
+
+[data-layout="flat"] .warp[data-state="ready"]::after {
+  animation: none;
+  background: var(--warp);
+  opacity: 0.25;
+}
+
+/* En botones: contorno más fino, halo más corto y vuelta algo más rápida */
+[data-layout="flat"] button.warp::before,
+[data-layout="flat"] button.warp::after {
+  animation-duration: 3.2s;
+}
+
+[data-layout="flat"] button.warp::before {
+  inset: -1px;
+  padding: 2px;
+}
+
+[data-layout="flat"] button.warp::after {
+  inset: -6px;
+  padding: 6px;
+  filter: blur(8px);
+}
+
+[data-layout="flat"] button.warp:hover::before,
+[data-layout="flat"] button.warp:hover::after {
+  animation-duration: 1.6s;
+}
+
+[data-layout="flat"] button.warp:disabled::before,
+[data-layout="flat"] button.warp:disabled::after {
+  opacity: 0;
+}
+
+/* Botón principal listo para usar: pulso suave hacia afuera */
+[data-layout="flat"] .cta-ready:not(:disabled) {
+  animation: cta-glow 2.2s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-layout="flat"] .warp::before,
+  [data-layout="flat"] .warp::after {
+    animation: none;
+    background: color-mix(in oklab, var(--warp) 60%, transparent);
+  }
+
+  [data-layout="flat"] .cta-ready:not(:disabled) {
+    animation: none;
+  }
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -170,6 +571,7 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--app-font-sans);
   }
 }
 

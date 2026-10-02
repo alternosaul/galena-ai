@@ -1,0 +1,13 @@
+# .venv pesa ~500 MB y se reinstala en la imagen: nunca debe entrar al contexto de build.
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Solo para desarrollo; la imagen sirve la API.
+tests/
+conftest.py
+requirements-dev.txt
+
+.DS_Store

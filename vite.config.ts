@@ -8,7 +8,7 @@ import { defineConfig, loadEnv } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig(({ command, mode }) => {
-  // En desarrollo, las rutas de servidor leen .env (SUPABASE_SECRET_KEY, MODEL_API_URL…) desde
+  // En desarrollo, las rutas de servidor leen .env (MODEL_API_URL…) desde
   // process.env. En la VPS las define systemd (/etc/galena-ai.env).
   if (command === "serve") {
     for (const [key, value] of Object.entries(loadEnv(mode, process.cwd(), ""))) {
@@ -26,8 +26,18 @@ export default defineConfig(({ command, mode }) => {
         // Use src/server.ts (our SSR error wrapper) as the server entry.
         server: { entry: "server" },
       }),
-      // Build a standalone Node server (.output/server/index.mjs) for the VPS behind nginx.
-      ...(command === "build" ? [nitro({ preset: "node-server" })] : []),
+      // Por defecto compila un servidor Node autónomo (.output/server/index.mjs) para la VPS
+      // detrás de nginx. En Vercel (que define VERCEL=1 al compilar) usa el preset vercel, que
+      // escribe .vercel/output y ejecuta las rutas /api/public/* como funciones. NITRO_PRESET
+      // tiene prioridad sobre ambos (p. ej. cloudflare_module).
+      ...(command === "build"
+        ? [
+            nitro({
+              preset:
+                process.env["NITRO_PRESET"] ?? (process.env["VERCEL"] ? "vercel" : "node-server"),
+            }),
+          ]
+        : []),
       viteReact(),
     ],
     resolve: {

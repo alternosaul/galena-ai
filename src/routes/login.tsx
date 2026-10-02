@@ -32,7 +32,7 @@ type Errors = Partial<Record<"name" | "email" | "password", string>>;
 
 const PROVIDER_LABEL = { google: "Google", github: "GitHub" } as const;
 
-/** Mensaje para los códigos de error de Supabase Auth. */
+/** Mensaje para los códigos de error de AuthFailure. */
 function errorKey(error: unknown, fallback: TKey): TKey {
   const code = error instanceof AuthFailure ? error.code : "";
   if (code === "invalid_credentials") return "login.errCredentials";
@@ -95,7 +95,7 @@ function LoginPage() {
   async function onProvider(provider: Exclude<AuthProviderId, "email">) {
     setPending(provider);
     try {
-      // Redirige al proveedor; al volver, Supabase restaura la sesión desde la URL.
+      // En la demo no hay OAuth real: entra como usuario de demo del proveedor.
       await loginWithProvider(provider);
     } catch {
       toast.error(t("login.errProvider", { provider: PROVIDER_LABEL[provider] }));

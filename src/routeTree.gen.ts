@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ApiConfigRouteImport } from './routes/api-config'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ModelRouteImport } from './routes/model'
@@ -23,11 +22,6 @@ import { Route as ApiPublicDetectAudioRouteImport } from './routes/api/public/de
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiConfigRoute = ApiConfigRouteImport.update({
-  id: '/api-config',
-  path: '/api-config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HistoryRoute = HistoryRouteImport.update({
@@ -73,7 +67,6 @@ const ApiPublicDetectAudioRoute = ApiPublicDetectAudioRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/api-config': typeof ApiConfigRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/model': typeof ModelRoute
@@ -85,7 +78,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/api-config': typeof ApiConfigRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/model': typeof ModelRoute
@@ -98,7 +90,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/api-config': typeof ApiConfigRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/model': typeof ModelRoute
@@ -112,7 +103,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/api-config'
     | '/history'
     | '/login'
     | '/model'
@@ -124,7 +114,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/api-config'
     | '/history'
     | '/login'
     | '/model'
@@ -136,7 +125,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/api-config'
     | '/history'
     | '/login'
     | '/model'
@@ -149,7 +137,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ApiConfigRoute: typeof ApiConfigRoute
   HistoryRoute: typeof HistoryRoute
   LoginRoute: typeof LoginRoute
   ModelRoute: typeof ModelRoute
@@ -166,13 +153,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api-config': {
-      id: '/api-config'
-      path: '/api-config'
-      fullPath: '/api-config'
-      preLoaderRoute: typeof ApiConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/history': {
@@ -248,7 +228,6 @@ const ApiPublicDetectRouteWithChildren = ApiPublicDetectRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ApiConfigRoute: ApiConfigRoute,
   HistoryRoute: HistoryRoute,
   LoginRoute: LoginRoute,
   ModelRoute: ModelRoute,

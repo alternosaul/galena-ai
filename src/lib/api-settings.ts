@@ -4,8 +4,6 @@ import { DEFAULT_DETECTOR_ID, findDetector } from "./detectors.data";
  * Preferencias de conexión editadas en la pantalla API.
  * Solo se guardan valores no sensibles en localStorage. La URL real que usa el servidor
  * es la variable de entorno MODEL_API_URL (ver src/lib/model-api.ts).
- *
- * TODO(Supabase): persistir estos valores en la tabla app_settings.
  */
 
 export type ApiSettings = {

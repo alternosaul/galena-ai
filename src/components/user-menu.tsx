@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut, Plug, UserRound } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -32,6 +32,7 @@ export function UserMenu() {
   const { t } = useI18n();
   const logout = useLogout();
 
+  // Demo sin sesión: no se muestra botón para iniciar sesión (/login sigue disponible por URL).
   if (!user) return null;
 
   return (
@@ -58,12 +59,6 @@ export function UserMenu() {
           <Link to="/profile">
             <UserRound className="mr-2 h-4 w-4" />
             {t("user.profile")}
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/api-config">
-            <Plug className="mr-2 h-4 w-4" />
-            {t("api.title")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
