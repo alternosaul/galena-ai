@@ -252,6 +252,11 @@ const es = {
   "cm.fn": "Falsos negativos",
   "cm.ofActual": "{pct} de las llamadas reales de {cls}",
 
+  // Aviso de versión beta
+  "beta.notice":
+    "Los modelos están en constante desarrollo, por lo que los resultados pueden no ser consistentes. Gracias por probar Galena-AI v{version} Beta.",
+  "beta.dismiss": "Cerrar aviso",
+
   // Autenticación
   "auth.loading": "Cargando…",
   "theme.lightShort": "Claro",
@@ -657,6 +662,10 @@ const en: Record<TKey, string> = {
   "cm.tn": "True negatives",
   "cm.fn": "False negatives",
   "cm.ofActual": "{pct} of actual {cls} calls",
+
+  "beta.notice":
+    "Our models are under constant development, so results may not be consistent. Thanks for trying Galena-AI v{version} Beta.",
+  "beta.dismiss": "Dismiss notice",
 
   "auth.loading": "Loading…",
   "theme.lightShort": "Light",

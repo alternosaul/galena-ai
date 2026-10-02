@@ -2,6 +2,7 @@ import { useEffect, type CSSProperties } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar } from "@/components/app-sidebar";
+import { BetaNotice } from "@/components/beta-notice";
 import { BrandLogo } from "@/components/brand-logo";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
@@ -38,6 +39,7 @@ export function AppShell() {
         <AppSidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
+          <BetaNotice />
           <main className="min-w-0 flex-1 p-4 md:p-6 md:flat:p-10">
             {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
             <Outlet />
